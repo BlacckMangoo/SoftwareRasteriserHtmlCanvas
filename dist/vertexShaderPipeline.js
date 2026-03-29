@@ -3,6 +3,8 @@ const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
+const frameBuffer = new Uint8ClampedArray(canvas.width * canvas.height * 4); // 4 for RGBA
+const depthBuffer = new Float32Array(canvas.width * canvas.height); // for depth testing
 const aspectRatio = canvas.width / canvas.height;
 const cellSize = 10;
 function dotProduct(a, b) {
@@ -248,46 +250,66 @@ function perspectiveProjection(point, cam) {
         z: projectedVec4.z / projectedVec4.w
     };
 }
-const cubeVertexData = [
-    // front face (z = 0.5)
-    { x: -0.5, y: -0.5, z: 0.5 },
-    { x: 0.5, y: -0.5, z: 0.5 },
-    { x: 0.5, y: 0.5, z: 0.5 },
-    { x: -0.5, y: 0.5, z: 0.5 },
-    // back face (z = -0.5)
-    { x: -0.5, y: -0.5, z: -0.5 },
-    { x: 0.5, y: -0.5, z: -0.5 },
-    { x: 0.5, y: 0.5, z: -0.5 },
-    { x: -0.5, y: 0.5, z: -0.5 },
-];
-const cubeEdges = [
-    // front face
-    [0, 1], [1, 2], [2, 3], [3, 0],
-    // back face
-    [4, 5], [5, 6], [6, 7], [7, 4],
-    // connecting edges
-    [0, 4], [1, 5], [2, 6], [3, 7],
-];
-function drawPoint(p) {
-    const point = convertPointFromNdcToScreenSpace(p);
-    if (ctx) {
-        ctx.fillStyle = "black";
-        const radius = cellSize * 0.5;
-        ctx.beginPath();
-        ctx.arc(point.x, point.y, radius, 0, Math.PI * 2);
-        ctx.fill();
+function clearFrameBuffer(col) {
+    for (let i = 0; i < frameBuffer.length; i += 4) {
+        frameBuffer[i] = col.r;
+        frameBuffer[i + 1] = col.g;
+        frameBuffer[i + 2] = col.b;
+        frameBuffer[i + 3] = col.a;
     }
 }
+function clearDepthBuffer() {
+    for (let i = 0; i < depthBuffer.length; i++) {
+        depthBuffer[i] = Infinity; // set all depths to infinity (far away)
+    }
+}
+// Writes to the frame buffer
+function setPixel(x, y, col) {
+    if (!Number.isFinite(x) || !Number.isFinite(y)) {
+        return;
+    }
+    const px = Math.floor(x);
+    const py = Math.floor(y);
+    if (px < 0 || px >= canvas.width || py < 0 || py >= canvas.height) {
+        return;
+    }
+    const index = (py * canvas.width + px) * 4;
+    frameBuffer[index] = col.r;
+    frameBuffer[index + 1] = col.g;
+    frameBuffer[index + 2] = col.b;
+    frameBuffer[index + 3] = col.a;
+}
+function drawPoint(p) {
+    const point = convertPointFromNdcToScreenSpace(p);
+    setPixel(point.x, point.y, { r: 255, g: 255, b: 255, a: 255 });
+}
 function drawLine(p1, p2) {
+    // DRAW LINE USING BRESENHAM'S LINE ALGORITHM
     const point1 = convertPointFromNdcToScreenSpace(p1);
     const point2 = convertPointFromNdcToScreenSpace(p2);
-    if (ctx) {
-        ctx.strokeStyle = "black";
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(point1.x, point1.y);
-        ctx.lineTo(point2.x, point2.y);
-        ctx.stroke();
+    let x0 = Math.round(point1.x);
+    let y0 = Math.round(point1.y);
+    const x1 = Math.round(point2.x);
+    const y1 = Math.round(point2.y);
+    const dx = Math.abs(x1 - x0);
+    const dy = Math.abs(y1 - y0);
+    const sx = x0 < x1 ? 1 : -1;
+    const sy = y0 < y1 ? 1 : -1;
+    let error = dx - dy;
+    while (true) {
+        setPixel(x0, y0, { r: 0, g: 0, b: 0, a: 255 });
+        if (x0 === x1 && y0 === y1) {
+            break;
+        }
+        const e2 = error * 2;
+        if (e2 > -dy) {
+            error -= dy;
+            x0 += sx;
+        }
+        if (e2 < dx) {
+            error += dx;
+            y0 += sy;
+        }
     }
 }
 function RotateAroundArbitraryAxisMatrix(input, axis, angle) {
@@ -318,14 +340,42 @@ function ScaleVec3(vec, scale) {
         z: vec.z * scale.z,
     };
 }
+const cubeVertexData = [
+    // front face (z = 0.5)
+    { x: -0.5, y: -0.5, z: 0.5 },
+    { x: 0.5, y: -0.5, z: 0.5 },
+    { x: 0.5, y: 0.5, z: 0.5 },
+    { x: -0.5, y: 0.5, z: 0.5 },
+    // back face (z = -0.5)
+    { x: -0.5, y: -0.5, z: -0.5 },
+    { x: 0.5, y: -0.5, z: -0.5 },
+    { x: 0.5, y: 0.5, z: -0.5 },
+    { x: -0.5, y: 0.5, z: -0.5 },
+];
+const cubeEdges = [
+    // front face
+    [0, 1], [1, 2], [2, 3], [3, 0],
+    // back face
+    [4, 5], [5, 6], [6, 7], [7, 4],
+    // connecting edges
+    [0, 4], [1, 5], [2, 6], [3, 7],
+];
 const CubeTransform = {
     rotationAxis: { x: 0, y: 1, z: 0 },
     rotAngle: 0,
     scale: { x: 1, y: 1, z: 1 },
     translation: { x: 0, y: 0, z: 0 }
 };
-const anotherCubeTransform = {
-    rotationAxis: { x: 1, y: 0, z: 0 },
+const TriangleVertexData = [
+    { x: 0, y: 0.5, z: 0 },
+    { x: -0.5, y: -0.5, z: 0 },
+    { x: 0.5, y: -0.5, z: 0 }
+];
+const TriangleEdges = [
+    [0, 1], [1, 2], [2, 0]
+];
+const TriangleTransform = {
+    rotationAxis: { x: 0, y: 1, z: 0 },
     rotAngle: 0,
     scale: { x: 1, y: 1, z: 1 },
     translation: { x: 2, y: 0, z: 0 }
@@ -345,15 +395,15 @@ const cubeMESH = {
     edgesData: cubeEdges,
     transform: CubeTransform
 };
-const anotherCubeMESH = {
-    name: "cubeB",
-    vertices: cubeVertexData,
-    edgesData: cubeEdges,
-    transform: anotherCubeTransform
+const triangleMESH = {
+    name: "triangleA",
+    vertices: TriangleVertexData,
+    edgesData: TriangleEdges,
+    transform: TriangleTransform
 };
 const scene = {
     cam,
-    meshes: [cubeMESH, anotherCubeMESH]
+    meshes: [cubeMESH, triangleMESH]
 };
 function DrawMesh(mesh, cam) {
     // we First Scale the Points in Thier Local Space 
@@ -379,12 +429,22 @@ function DrawMesh(mesh, cam) {
         drawPoint(point);
     });
 }
+function DrawFrameBuffer() {
+    if (ctx) {
+        const imageData = new ImageData(frameBuffer, canvas.width, canvas.height);
+        ctx.putImageData(imageData, 0, 0);
+    }
+}
 function renderScene(scene, ctx) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    clearFrameBuffer({ r: 255, g: 255, b: 255, a: 255 });
     scene.meshes.forEach(mesh => DrawMesh(mesh, scene.cam));
 }
 setInterval(() => {
     if (ctx) {
         renderScene(scene, ctx);
+        //rotate the cube a bit for the next frame
+        scene.meshes[0].transform.rotAngle += 0.01;
+        DrawFrameBuffer();
     }
 }, 10);
