@@ -82,6 +82,9 @@ function clearFrameBuffer(col: Color): void {
 function clearDepthBuffer(): void {
     for (let i = 0; i < depthBuffer.length; i++) {
         depthBuffer[i] = Infinity; // set all depths to infinity (far away)
+
+        // remember smaller z means that object is closer to the camera should be drawn in front of objects with larger z values
+
     }
 }
 
@@ -375,7 +378,15 @@ function DrawFrameBuffer() {
 }
 
 function edgeFunction(a: Point, b: Point, c: Point): number {
-    return (c.x - a.x) * (b.y - a.y) - (c.y - a.y) * (b.x - a.x);
+    const vectorAB = { x: b.x - a.x, y: b.y - a.y };
+    const vectorAC = { x: c.x - a.x, y: c.y - a.y };
+    const cross = vectorAB.x * vectorAC.y - vectorAB.y * vectorAC.x;
+    return cross;
+
+    // > 0 means that c is on the left side of the directed edge from a to b
+    // < 0 means that c is on the right side of the directed edge from a to b
+    // = 0 means that a, b and c are collinear
+     
 }
 
 function RasteriseTriangle(p1: Point, p2: Point, p3: Point, col: Color) {
