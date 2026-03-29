@@ -1,10 +1,4 @@
 const controls = {
-    camX: 0,
-    camY: 0,
-    camZ: 5,
-    fov: 45,
-    near: 0.1,
-    far: 1000,
     rotDeg: 0,
     rotAxisX: 0,
     rotAxisY: 1,
@@ -26,7 +20,7 @@ function createControlsPanel() {
     panel.style.left = "12px";
     panel.style.width = "320px";
     const title = document.createElement("h3");
-    title.textContent = "Scene Controls";
+    title.textContent = "Transform Controls";
     title.style.margin = "0 0 10px 0";
     panel.appendChild(title);
     return panel;

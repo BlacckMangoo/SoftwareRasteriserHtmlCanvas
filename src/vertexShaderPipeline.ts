@@ -9,7 +9,7 @@ canvas.height = window.innerHeight;
 
 const aspectRatio = canvas.width / canvas.height;
 
-const cellSize = 5;
+const cellSize = 10;
 
 interface Point {
     x: number;
@@ -52,6 +52,29 @@ interface Matrix3{
     r1: Vec3;
     r2: Vec3;
     r3: Vec3;
+}
+
+interface UIState {
+     selectedMeshIndex: number;
+}
+
+interface Transform {
+    rotationAxis : Vec3;
+    rotAngle : number;
+    scale: Vec3;
+    translation: Vec3;
+}
+
+
+interface Mesh {
+    vertices: Point[];
+    edgesData : Array<[number, number]>;
+    transform: Transform;
+}
+
+interface Scene {
+    cam : Camera;
+    meshes : Mesh[];
 }
 
 function dotProduct(a: Vec3, b: Vec3): number {
@@ -315,7 +338,6 @@ function CameraBasis(cam: Camera): Matrix3 {
         r3: { x: -forward.x, y: -forward.y, z: -forward.z } 
         // we negate the forward vector because we want to transform points from world space to camera space and in camera space the camera is looking down the negative z axis
     };
-
 }
 
 function perspectiveProjection(point: Point, cam: Camera): Point {
@@ -355,7 +377,8 @@ function perspectiveProjection(point: Point, cam: Camera): Point {
 
 
 
-const points : Point[] = [
+
+const cubeVertexData : Point[] = [
     // front face (z = 0.5)
     { x: -0.5, y: -0.5, z: 0.5 },
     { x: 0.5, y: -0.5, z: 0.5 },
@@ -381,7 +404,10 @@ function drawPoint(p: Point) {
     const point = convertPointFromNdcToScreenSpace(p);
     if (ctx) {
         ctx.fillStyle = "black";
-        ctx.fillRect(point.x, point.y, cellSize, cellSize);
+        const radius = cellSize * 0.5;
+        ctx.beginPath();
+        ctx.arc(point.x, point.y, radius, 0, Math.PI * 2);
+        ctx.fill();
     }
 }
 
@@ -437,14 +463,6 @@ function ScaleVec3(vec: Vec3, scale: Vec3): Vec3 {
 
 const controlsPanel = createControlsPanel();
 
-addSliders(controlsPanel, [
-    { key: "camX", label: "Cam X", min: -10, max: 10, step: 0.1 },
-    { key: "camY", label: "Cam Y", min: -10, max: 10, step: 0.1 },
-    { key: "camZ", label: "Cam Z", min: -20, max: 20, step: 0.1 },
-    { key: "fov", label: "FOV", min: 20, max: 120, step: 1 },
-    { key: "near", label: "Near", min: 0.05, max: 10, step: 0.05 },
-    { key: "far", label: "Far", min: 5, max: 2000, step: 5 },
-]);
 
 addSliders(controlsPanel, [
     { key: "rotDeg", label: "Rotation (deg)", min: 0, max: 360, step: 1 },
@@ -468,73 +486,78 @@ addSliders(controlsPanel, [
 
 
 
+const CubeTransform: Transform = {
+    rotationAxis: { x: 0, y: 1, z: 0 },
+    rotAngle: 0,
+    scale: { x: 1, y: 1, z: 1 },
+    translation: { x: 0, y: 0, z: 0 }
+};
+
+const anotherCubeTransform: Transform = {
+    rotationAxis: { x: 1, y: 0, z: 0 },
+    rotAngle: 0,
+    scale: { x: 1, y: 1, z: 1 },
+    translation: { x: 2, y: 0, z: 0 }
+};
+
 const cam : Camera = {
-    position: { x: controls.camX, y: controls.camY, z: controls.camZ },
-    lookAt: { x: controls.camX, y: controls.camY, z: controls.camZ - 1 },
-    up: { x: 0, y: 1, z: 0 },
-    far: controls.far,
-    near: controls.near,
-    fov: controls.fov,
+    position: { x: 0, y: 0, z: 5 },
+    lookAt: { x: 0, y: 0, z: 0 },
+    up: { x: 0, y: 1, z: 0 },   
+    near: 0.1,
+    far: 1000,
+    fov: 45,
     ar: aspectRatio
 };
 
-const cameraForward: Vec3 = { x: 0, y: 0, z: -1 };
+const cubeMESH: Mesh = {
+    vertices: cubeVertexData,
+    edgesData: cubeEdges,
+    transform: CubeTransform
+};
 
+const anotherCubeMESH: Mesh = {
+    vertices: cubeVertexData,
+    edgesData: cubeEdges,
+    transform: anotherCubeTransform
+};
 
-//translate points to right 
-const timestart = performance.now();
-setInterval(() => {
-    if (ctx) {
-        cam.position = { x: controls.camX, y: controls.camY, z: controls.camZ };
-        cam.lookAt = {
-            x: cam.position.x + cameraForward.x,
-            y: cam.position.y + cameraForward.y,
-            z: cam.position.z + cameraForward.z,
-        };
-        cam.fov = controls.fov;
-        cam.near = controls.near;
-        cam.far = Math.max(controls.far, controls.near + 0.1);
+const scene : Scene = {
+    cam,
+    meshes : [cubeMESH, anotherCubeMESH]
+};
 
-        const cameraBasis = CameraBasis(cam);
+function DrawMesh(mesh: Mesh, cam: Camera ) {
 
-        // we First Scale the Points in Thier Local Space 
-        const scaledPoints = points.map(point => ScaleVec3(point, {
-            x: controls.scaleX,
-            y: controls.scaleY,
-            z: controls.scaleZ,
-        }));
+    // we First Scale the Points in Thier Local Space 
 
-        //then we rotate the points around an arbitrary axis (in this case the vector (1, 1, 1)) that goes through the origin of the world space
-        const rotatedPoints = scaledPoints.map(point => RotateAroundArbitraryAxisMatrix(point, { x: controls.rotAxisX, y: controls.rotAxisY, z: controls.rotAxisZ }, controls.rotDeg * Math.PI / 180));
+    const scaledPoints = mesh.vertices.map(point => ScaleVec3(point, mesh.transform.scale));
+    //then we rotate the points around an arbitrary axis (in this case the vector (1, 1, 1)) that goes through the origin of the world space
 
-        // then we translate the points to the right in world space
-        const translatedPoints = rotatedPoints.map(point => TranslateVec3(point, {
-            x: controls.translateX,
-            y: controls.translateY,
-            z: controls.translateZ,
-        }));
-
-        // SCALE -> ROTATE -> TRANSLATE pipeline converts points from their local space to the world space 
+    const rotatedPoints = scaledPoints.map(point => RotateAroundArbitraryAxisMatrix(point,
+        mesh.transform.rotationAxis,
+        mesh.transform.rotAngle));
+    const translatedPoints = rotatedPoints.map(point => TranslateVec3(point, mesh.transform.translation));
+   // SCALE -> ROTATE -> TRANSLATE pipeline converts points from their local space to the world space 
 
         // now we need to transform the points from world space to camera space ( again change of basis )
         // first we move all the points so that the camera is the origin of the world space 
 
-        const pointsShiftedSoCameraIsOrigin = translatedPoints.map(point => TranslateVec3(point, { x: -cam.position.x, y: -cam.position.y, z: -cam.position.z }));
-
+    const pointsShiftedSoCameraIsOrigin = translatedPoints.map(point => TranslateVec3(point, { x: -cam.position.x, y: -cam.position.y, z: -cam.position.z }));
         // then we change the basis from the world space basis to the camera space basis
-        const pointsInCameraSpace = pointsShiftedSoCameraIsOrigin.map(point => multiplyMatrix3Vec3(cameraBasis, point));
-        
-        // now we can observe that moving the camera in the z direction doesnt do anything , ie the points that are far away from the camera are not getting smaller with distance 
+
+    const cameraBasis = CameraBasis(cam);
+    const pointsInCameraSpace = pointsShiftedSoCameraIsOrigin.map(point => multiplyMatrix3Vec3(cameraBasis, point));
+      // now we can observe that moving the camera in the z direction doesnt do anything , ie the points that are far away from the camera are not getting smaller with distance 
         
         // now as the final step , we need project the points in camera onto a 2d Screen ( in our example the screen is placed at z = 0 ) , camera is looking down the negative z axis and the projection plane is between the camera and the origin of the world space
         // we can think of this project as if shooting a way from the position of the camera to the point in camera space and finding where it intersects the plane z = 0 ( the screen )
 
-        const projectedPoints = pointsInCameraSpace.map(point => perspectiveProjection(point, cam));
+    const projectedPoints = pointsInCameraSpace.map(point => perspectiveProjection(point, cam));
 
+    
 
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-        cubeEdges.forEach(([startIndex, endIndex]) => {
+        mesh.edgesData.forEach(([startIndex, endIndex]) => {
             drawLine(projectedPoints[startIndex], projectedPoints[endIndex]);
         });
 
@@ -542,6 +565,28 @@ setInterval(() => {
             drawPoint(point);
         });
 
-  
+       
+
+}
+
+
+
+function renderScene(scene: Scene, ctx: CanvasRenderingContext2D) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    scene.meshes.forEach(mesh => DrawMesh(mesh, scene.cam,));
+}
+
+
+const cameraForward: Vec3 = { x: 0, y: 0, z: -1 };
+ const cameraBasis = CameraBasis(cam);
+
+
+//translate points to right 
+const timestart = performance.now();
+setInterval(() => {
+    if (ctx) {
+        
+        renderScene(scene, ctx);
+
  }
 },10);

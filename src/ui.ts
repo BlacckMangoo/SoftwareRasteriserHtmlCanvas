@@ -1,18 +1,13 @@
 interface SliderConfig {
-    key: keyof SceneControls;
+    key: keyof TransformControls;
     label: string;
     min: number;
     max: number;
     step: number;
 }
 
-interface SceneControls {
-    camX: number;
-    camY: number;
-    camZ: number;
-    fov: number;
-    near: number;
-    far: number;
+
+interface TransformControls {
     rotDeg: number;
     rotAxisX: number;
     rotAxisY: number;
@@ -25,13 +20,7 @@ interface SceneControls {
     translateZ: number;
 }
 
-const controls: SceneControls = {
-    camX: 0,
-    camY: 0,
-    camZ: 5,
-    fov: 45,
-    near: 0.1,
-    far: 1000,
+const controls: TransformControls = {
     rotDeg: 0,
     rotAxisX: 0,
     rotAxisY: 1,
@@ -57,12 +46,11 @@ function createControlsPanel(): HTMLElement {
 
 
     const title = document.createElement("h3");
-    title.textContent = "Scene Controls";
+    title.textContent = "Transform Controls";
     title.style.margin = "0 0 10px 0";
     panel.appendChild(title);
     return panel;
 }
-
 
 
 function addSlider(parent: HTMLElement, config: SliderConfig): void {
