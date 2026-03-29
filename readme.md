@@ -20,3 +20,7 @@ Multiple meshes (cube, triangle, quad)
 Per-mesh transform state (position, rotation axis/angle, scale)
 Camera state (position, FOV, near, far)
 Interactive UI — sliders for all transform + camera params, mesh selector
+
+# Screenshots
+
+![Screenshot 1](media/ss1.png)
