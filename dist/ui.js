@@ -1,4 +1,4 @@
-const controls = {
+const transformControls = {
     rotDeg: 0,
     rotAxisX: 0,
     rotAxisY: 1,
@@ -10,7 +10,14 @@ const controls = {
     translateY: 0,
     translateZ: 0,
 };
-const sliderBindings = {};
+const cameraControls = {
+    camX: 0,
+    camY: 0,
+    camZ: 5,
+    camFov: 45,
+    camNear: 0.1,
+    camFar: 1000,
+};
 function createTransformControlPanel() {
     const panel = document.getElementById("transform-controls");
     if (!panel) {
@@ -28,6 +35,34 @@ function createTransformControlPanel() {
     panel.style.zIndex = "10";
     const title = document.createElement("h3");
     title.textContent = "Transform Controls";
+    title.style.margin = "0 0 10px 0";
+    panel.appendChild(title);
+    return panel;
+}
+function createCameraControlPanel() {
+    let panel = document.getElementById("camera-controls");
+    if (!panel) {
+        panel = document.createElement("div");
+        panel.id = "camera-controls";
+        document.body.appendChild(panel);
+    }
+    const transformPanel = document.getElementById("transform-controls");
+    const transformRect = transformPanel?.getBoundingClientRect();
+    const top = transformRect ? transformRect.bottom + 12 : 12;
+    const left = transformRect ? transformRect.left : 12;
+    panel.innerHTML = "";
+    panel.style.position = "fixed";
+    panel.style.top = `${top}px`;
+    panel.style.left = `${left}px`;
+    panel.style.width = "320px";
+    panel.style.padding = "10px";
+    panel.style.border = "1px solid #999";
+    panel.style.background = "rgba(255, 255, 255, 0.92)";
+    panel.style.borderRadius = "8px";
+    panel.style.fontFamily = "sans-serif";
+    panel.style.zIndex = "10";
+    const title = document.createElement("h3");
+    title.textContent = "Camera Controls";
     title.style.margin = "0 0 10px 0";
     panel.appendChild(title);
     return panel;
@@ -98,7 +133,7 @@ function createMeshSelectPanel(config) {
     }
     return panel;
 }
-function addSlider(parent, config) {
+function addSlider(parent, config, state) {
     const wrapper = document.createElement("div");
     wrapper.style.marginBottom = "8px";
     const label = document.createElement("label");
@@ -108,7 +143,7 @@ function addSlider(parent, config) {
     const caption = document.createElement("span");
     caption.textContent = config.label;
     const value = document.createElement("span");
-    value.textContent = controls[config.key].toFixed(2);
+    value.textContent = Number(state[config.key]).toFixed(2);
     label.appendChild(caption);
     label.appendChild(value);
     const input = document.createElement("input");
@@ -116,31 +151,20 @@ function addSlider(parent, config) {
     input.min = String(config.min);
     input.max = String(config.max);
     input.step = String(config.step);
-    input.value = String(controls[config.key]);
+    input.value = String(state[config.key]);
     input.style.width = "100%";
     input.addEventListener("input", () => {
-        controls[config.key] = Number(input.value);
-        value.textContent = controls[config.key].toFixed(2);
+        state[config.key] = Number(input.value);
+        value.textContent = Number(state[config.key]).toFixed(2);
     });
-    sliderBindings[config.key] = {
-        input,
-        valueText: value,
-    };
     wrapper.appendChild(label);
     wrapper.appendChild(input);
     parent.appendChild(wrapper);
 }
-function syncControlsToUi() {
-    Object.keys(sliderBindings).forEach((key) => {
-        const binding = sliderBindings[key];
-        if (!binding) {
-            return;
-        }
-        binding.input.value = String(controls[key]);
-        binding.valueText.textContent = controls[key].toFixed(2);
-    });
+function addTransformSliders(parent, configs) {
+    configs.forEach((config) => addSlider(parent, config, transformControls));
 }
-function addSliders(parent, configs) {
-    configs.forEach((config) => addSlider(parent, config));
+function addCameraSliders(parent, configs) {
+    configs.forEach((config) => addSlider(parent, config, cameraControls));
 }
-export { controls, createTransformControlPanel, createMeshSelectPanel, syncControlsToUi, addSlider, addSliders };
+export { transformControls, cameraControls, createTransformControlPanel, createCameraControlPanel, createMeshSelectPanel, addTransformSliders, addCameraSliders };

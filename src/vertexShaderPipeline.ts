@@ -1,6 +1,4 @@
 
-import { controls, createTransformControlPanel, createMeshSelectPanel, syncControlsToUi, addSliders } from "./ui.js";
-
 const canvas = document.getElementById("canvas") as HTMLCanvasElement;
 const ctx = canvas.getContext("2d");
 
@@ -52,10 +50,6 @@ interface Matrix3{
     r1: Vec3;
     r2: Vec3;
     r3: Vec3;
-}
-
-interface UiState {
-    selectedMeshIndex: number;
 }
 
 interface Transform {
@@ -447,32 +441,6 @@ function ScaleVec3(vec: Vec3, scale: Vec3): Vec3 {
 }
 
 
-const controlsPanel = createTransformControlPanel();
-
-
-
-addSliders(controlsPanel, [
-    { key: "rotDeg", label: "Rotation (deg)", min: 0, max: 360, step: 1 },
-    { key:"rotAxisX", label: "Rotation Axis X", min: -1, max: 1, step: 0.01 },
-    { key:"rotAxisY", label: "Rotation Axis Y", min: -1, max: 1, step: 0.01 },
-    { key:"rotAxisZ", label: "Rotation Axis Z", min: -1, max: 1, step: 0.01 },
-
-]);
-
-addSliders(controlsPanel, [
-    { key: "scaleX", label: "Scale X", min: 0.1, max: 3, step: 0.05 },
-    { key: "scaleY", label: "Scale Y", min: 0.1, max: 3, step: 0.05 },
-    { key: "scaleZ", label: "Scale Z", min: 0.1, max: 3, step: 0.05 },
-]);
-
-addSliders(controlsPanel, [
-    { key: "translateX", label: "Translate X", min: -5, max: 5, step: 0.1 },
-    { key: "translateY", label: "Translate Y", min: -5, max: 5, step: 0.1 },
-    { key: "translateZ", label: "Translate Z", min: -5, max: 5, step: 0.1 },
-]);
-
-
-
 const CubeTransform: Transform = {
     rotationAxis: { x: 0, y: 1, z: 0 },
     rotAngle: 0,
@@ -516,10 +484,6 @@ const scene : Scene = {
     meshes : [cubeMESH, anotherCubeMESH]
 };
 
-const uiState: UiState = {
-    selectedMeshIndex: 0,
-};
-
 function DrawMesh(mesh: Mesh, cam: Camera ) {
 
     // we First Scale the Points in Thier Local Space 
@@ -559,67 +523,13 @@ function DrawMesh(mesh: Mesh, cam: Camera ) {
         });
 }
 
-function updateMeshTransformFromUI(mesh: Mesh) {
-    mesh.transform.rotAngle = controls.rotDeg * (Math.PI / 180);
-    mesh.transform.rotationAxis = { x: controls.rotAxisX, y: controls.rotAxisY, z: controls.rotAxisZ };
-    mesh.transform.scale = { x: controls.scaleX, y: controls.scaleY, z: controls.scaleZ };
-    mesh.transform.translation = { x: controls.translateX, y: controls.translateY, z: controls.translateZ };
-}
-
-function updateUIFromMeshTransform(mesh: Mesh) {
-    controls.rotDeg = mesh.transform.rotAngle * (180 / Math.PI);
-    controls.rotAxisX = mesh.transform.rotationAxis.x;
-    controls.rotAxisY = mesh.transform.rotationAxis.y;
-    controls.rotAxisZ = mesh.transform.rotationAxis.z;
-    controls.scaleX = mesh.transform.scale.x;
-    controls.scaleY = mesh.transform.scale.y;
-    controls.scaleZ = mesh.transform.scale.z;
-    controls.translateX = mesh.transform.translation.x;
-    controls.translateY = mesh.transform.translation.y;
-    controls.translateZ = mesh.transform.translation.z;
-    syncControlsToUi();
-}
-
-updateUIFromMeshTransform(scene.meshes[uiState.selectedMeshIndex]);
-
-createMeshSelectPanel({
-    options: scene.meshes.map((mesh, index) => ({ label: mesh.name, value: index })),
-    selectedValue: uiState.selectedMeshIndex,
-    onChange: (value) => {
-        const previousMesh = scene.meshes[uiState.selectedMeshIndex];
-        if (previousMesh) {
-            updateMeshTransformFromUI(previousMesh);
-        }
-
-        uiState.selectedMeshIndex = value;
-
-        const nextMesh = scene.meshes[uiState.selectedMeshIndex];
-        if (nextMesh) {
-            updateUIFromMeshTransform(nextMesh);
-        }
-    },
-});
-
-
 function renderScene(scene: Scene, ctx: CanvasRenderingContext2D) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     scene.meshes.forEach(mesh => DrawMesh(mesh, scene.cam,));
 }
 
-
-
-const cameraForward: Vec3 = { x: 0, y: 0, z: -1 };
- const cameraBasis = CameraBasis(cam);
-
-
-//translate points to right 
-const timestart = performance.now();
 setInterval(() => {
     if (ctx) {
-        const selectedMesh = scene.meshes[uiState.selectedMeshIndex];
-        if (selectedMesh) {
-            updateMeshTransformFromUI(selectedMesh);
-        }
         renderScene(scene, ctx);
 
  }

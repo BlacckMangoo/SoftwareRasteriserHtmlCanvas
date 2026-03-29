@@ -1,4 +1,4 @@
-import { controls, createTransformControlPanel, createMeshSelectPanel, syncControlsToUi, addSliders } from "./ui.js";
+"use strict";
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 canvas.width = window.innerWidth;
@@ -318,23 +318,6 @@ function ScaleVec3(vec, scale) {
         z: vec.z * scale.z,
     };
 }
-const controlsPanel = createTransformControlPanel();
-addSliders(controlsPanel, [
-    { key: "rotDeg", label: "Rotation (deg)", min: 0, max: 360, step: 1 },
-    { key: "rotAxisX", label: "Rotation Axis X", min: -1, max: 1, step: 0.01 },
-    { key: "rotAxisY", label: "Rotation Axis Y", min: -1, max: 1, step: 0.01 },
-    { key: "rotAxisZ", label: "Rotation Axis Z", min: -1, max: 1, step: 0.01 },
-]);
-addSliders(controlsPanel, [
-    { key: "scaleX", label: "Scale X", min: 0.1, max: 3, step: 0.05 },
-    { key: "scaleY", label: "Scale Y", min: 0.1, max: 3, step: 0.05 },
-    { key: "scaleZ", label: "Scale Z", min: 0.1, max: 3, step: 0.05 },
-]);
-addSliders(controlsPanel, [
-    { key: "translateX", label: "Translate X", min: -5, max: 5, step: 0.1 },
-    { key: "translateY", label: "Translate Y", min: -5, max: 5, step: 0.1 },
-    { key: "translateZ", label: "Translate Z", min: -5, max: 5, step: 0.1 },
-]);
 const CubeTransform = {
     rotationAxis: { x: 0, y: 1, z: 0 },
     rotAngle: 0,
@@ -372,9 +355,6 @@ const scene = {
     cam,
     meshes: [cubeMESH, anotherCubeMESH]
 };
-const uiState = {
-    selectedMeshIndex: 0,
-};
 function DrawMesh(mesh, cam) {
     // we First Scale the Points in Thier Local Space 
     const scaledPoints = mesh.vertices.map(point => ScaleVec3(point, mesh.transform.scale));
@@ -399,55 +379,12 @@ function DrawMesh(mesh, cam) {
         drawPoint(point);
     });
 }
-function updateMeshTransformFromUI(mesh) {
-    mesh.transform.rotAngle = controls.rotDeg * (Math.PI / 180);
-    mesh.transform.rotationAxis = { x: controls.rotAxisX, y: controls.rotAxisY, z: controls.rotAxisZ };
-    mesh.transform.scale = { x: controls.scaleX, y: controls.scaleY, z: controls.scaleZ };
-    mesh.transform.translation = { x: controls.translateX, y: controls.translateY, z: controls.translateZ };
-}
-function updateUIFromMeshTransform(mesh) {
-    controls.rotDeg = mesh.transform.rotAngle * (180 / Math.PI);
-    controls.rotAxisX = mesh.transform.rotationAxis.x;
-    controls.rotAxisY = mesh.transform.rotationAxis.y;
-    controls.rotAxisZ = mesh.transform.rotationAxis.z;
-    controls.scaleX = mesh.transform.scale.x;
-    controls.scaleY = mesh.transform.scale.y;
-    controls.scaleZ = mesh.transform.scale.z;
-    controls.translateX = mesh.transform.translation.x;
-    controls.translateY = mesh.transform.translation.y;
-    controls.translateZ = mesh.transform.translation.z;
-    syncControlsToUi();
-}
-updateUIFromMeshTransform(scene.meshes[uiState.selectedMeshIndex]);
-createMeshSelectPanel({
-    options: scene.meshes.map((mesh, index) => ({ label: mesh.name, value: index })),
-    selectedValue: uiState.selectedMeshIndex,
-    onChange: (value) => {
-        const previousMesh = scene.meshes[uiState.selectedMeshIndex];
-        if (previousMesh) {
-            updateMeshTransformFromUI(previousMesh);
-        }
-        uiState.selectedMeshIndex = value;
-        const nextMesh = scene.meshes[uiState.selectedMeshIndex];
-        if (nextMesh) {
-            updateUIFromMeshTransform(nextMesh);
-        }
-    },
-});
 function renderScene(scene, ctx) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     scene.meshes.forEach(mesh => DrawMesh(mesh, scene.cam));
 }
-const cameraForward = { x: 0, y: 0, z: -1 };
-const cameraBasis = CameraBasis(cam);
-//translate points to right 
-const timestart = performance.now();
 setInterval(() => {
     if (ctx) {
-        const selectedMesh = scene.meshes[uiState.selectedMeshIndex];
-        if (selectedMesh) {
-            updateMeshTransformFromUI(selectedMesh);
-        }
         renderScene(scene, ctx);
     }
 }, 10);
