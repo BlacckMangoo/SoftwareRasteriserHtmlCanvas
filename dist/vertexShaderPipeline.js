@@ -1,4 +1,5 @@
-"use strict";
+import { INITUI } from "./ui.js";
+import { getCameraState, getMeshTransformState } from "./stateManager.js";
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 canvas.width = window.innerWidth;
@@ -360,11 +361,11 @@ const cubeEdges = [
     // connecting edges
     [0, 4], [1, 5], [2, 6], [3, 7],
 ];
-const CubeTransform = {
+const cubeInitialTransformState = {
+    position: { x: 0, y: 0, z: 0 },
     rotationAxis: { x: 0, y: 1, z: 0 },
-    rotAngle: 0,
     scale: { x: 1, y: 1, z: 1 },
-    translation: { x: 0, y: 0, z: 0 }
+    rotationAngle: 0,
 };
 const TriangleVertexData = [
     { x: 0, y: 0.5, z: 0 },
@@ -374,43 +375,70 @@ const TriangleVertexData = [
 const TriangleEdges = [
     [0, 1], [1, 2], [2, 0]
 ];
-const TriangleTransform = {
-    rotationAxis: { x: 0, y: 1, z: 0 },
-    rotAngle: 0,
-    scale: { x: 1, y: 1, z: 1 },
-    translation: { x: 2, y: 0, z: 0 }
-};
-const cam = {
-    position: { x: 0, y: 0, z: 5 },
-    lookAt: { x: 0, y: 0, z: 0 },
-    up: { x: 0, y: 1, z: 0 },
-    near: 0.1,
-    far: 1000,
-    fov: 45,
-    ar: aspectRatio
+const quadVertexData = [
+    { x: -0.5, y: 0.5, z: 0 },
+    { x: -0.5, y: -0.5, z: 0 },
+    { x: 0.5, y: -0.5, z: 0 },
+    { x: 0.5, y: 0.5, z: 0 }
+];
+const quadEdges = [
+    [0, 1], [1, 2], [2, 3], [3, 0]
+];
+const quadMesh = {
+    name: "quadA",
+    vertices: quadVertexData,
+    edgesData: quadEdges,
 };
 const cubeMESH = {
     name: "cubeA",
     vertices: cubeVertexData,
     edgesData: cubeEdges,
-    transform: CubeTransform
 };
 const triangleMESH = {
     name: "triangleA",
     vertices: TriangleVertexData,
     edgesData: TriangleEdges,
-    transform: TriangleTransform
 };
 const scene = {
-    cam,
-    meshes: [cubeMESH, triangleMESH]
+    cam: {
+        position: { x: 0, y: 0, z: 5 },
+        lookAt: { x: 0, y: 0, z: 0 },
+        up: { x: 0, y: 1, z: 0 },
+        near: 0.1,
+        far: 1000,
+        fov: 45,
+        ar: aspectRatio,
+    },
+    meshes: [cubeMESH, triangleMESH, quadMesh]
 };
-function DrawMesh(mesh, cam) {
+INITUI();
+const getRenderCamera = () => {
+    const camState = getCameraState();
+    const lookAt = updateCameraLookAt(camState.position);
+    return {
+        position: { ...camState.position },
+        lookAt,
+        up: { x: 0, y: 1, z: 0 },
+        near: camState.near,
+        far: camState.far,
+        fov: camState.fov,
+        ar: aspectRatio,
+    };
+};
+function updateCameraLookAt(position) {
+    const cameraForward = { x: 0, y: 0, z: -1 };
+    return {
+        x: position.x + cameraForward.x,
+        y: position.y + cameraForward.y,
+        z: position.z + cameraForward.z,
+    };
+}
+function DrawMesh(mesh, transform, cam) {
     // we First Scale the Points in Thier Local Space 
-    const scaledPoints = mesh.vertices.map(point => ScaleVec3(point, mesh.transform.scale));
+    const scaledPoints = mesh.vertices.map(point => ScaleVec3(point, transform.scale));
     //then we rotate the points around an arbitrary axis (in this case the vector (1, 1, 1)) that goes through the origin of the world space
-    const rotatedPoints = scaledPoints.map(point => RotateAroundArbitraryAxisMatrix(point, mesh.transform.rotationAxis, mesh.transform.rotAngle));
-    const translatedPoints = rotatedPoints.map(point => TranslateVec3(point, mesh.transform.translation));
+    const rotatedPoints = scaledPoints.map(point => RotateAroundArbitraryAxisMatrix(point, transform.rotationAxis, transform.rotAngle));
+    const translatedPoints = rotatedPoints.map(point => TranslateVec3(point, transform.translation));
     // SCALE -> ROTATE -> TRANSLATE pipeline converts points from their local space to the world space 
     // now we need to transform the points from world space to camera space ( again change of basis )
     // first we move all the points so that the camera is the origin of the world space 
@@ -429,6 +457,18 @@ function DrawMesh(mesh, cam) {
         drawPoint(point);
     });
 }
+function getTransformForMesh(meshName) {
+    const transformState = getMeshTransformState(meshName);
+    return {
+        translation: { ...transformState.position },
+        rotationAxis: { ...transformState.rotationAxis },
+        scale: { ...transformState.scale },
+        rotAngle: transformState.rotationAngle,
+    };
+}
+function drawMeshFromState(mesh, cam) {
+    DrawMesh(mesh, getTransformForMesh(mesh.name), cam);
+}
 function DrawFrameBuffer() {
     if (ctx) {
         const imageData = new ImageData(frameBuffer, canvas.width, canvas.height);
@@ -436,15 +476,14 @@ function DrawFrameBuffer() {
     }
 }
 function renderScene(scene, ctx) {
+    const renderCam = getRenderCamera();
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     clearFrameBuffer({ r: 255, g: 255, b: 255, a: 255 });
-    scene.meshes.forEach(mesh => DrawMesh(mesh, scene.cam));
+    scene.meshes.forEach((mesh) => drawMeshFromState(mesh, renderCam));
 }
 setInterval(() => {
     if (ctx) {
         renderScene(scene, ctx);
-        //rotate the cube a bit for the next frame
-        scene.meshes[0].transform.rotAngle += 0.01;
         DrawFrameBuffer();
     }
 }, 10);
