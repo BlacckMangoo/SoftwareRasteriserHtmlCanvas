@@ -10,19 +10,92 @@ const controls = {
     translateY: 0,
     translateZ: 0,
 };
-function createControlsPanel() {
-    const panel = document.getElementById("controls");
+const sliderBindings = {};
+function createTransformControlPanel() {
+    const panel = document.getElementById("transform-controls");
     if (!panel) {
-        throw new Error("Controls container with id 'controls' was not found.");
+        throw new Error("Controls container with id 'transform-controls' was not found.");
     }
     panel.style.position = "fixed";
     panel.style.top = "12px";
     panel.style.left = "12px";
     panel.style.width = "320px";
+    panel.style.padding = "10px";
+    panel.style.border = "1px solid #999";
+    panel.style.background = "rgba(255, 255, 255, 0.92)";
+    panel.style.borderRadius = "8px";
+    panel.style.fontFamily = "sans-serif";
+    panel.style.zIndex = "10";
     const title = document.createElement("h3");
     title.textContent = "Transform Controls";
     title.style.margin = "0 0 10px 0";
     panel.appendChild(title);
+    return panel;
+}
+function createMeshSelectPanel(config) {
+    const panel = document.getElementById(config.mountId ?? "mesh-selector");
+    if (!panel) {
+        throw new Error("Mesh selector container with id 'mesh-selector' was not found.");
+    }
+    panel.innerHTML = "";
+    panel.style.position = "fixed";
+    panel.style.bottom = "12px";
+    panel.style.left = "12px";
+    panel.style.width = "220px";
+    panel.style.padding = "10px";
+    panel.style.border = "1px solid #999";
+    panel.style.background = "rgba(255, 255, 255, 0.92)";
+    panel.style.borderRadius = "8px";
+    panel.style.fontFamily = "sans-serif";
+    panel.style.zIndex = "10";
+    const treeRoot = document.createElement("ul");
+    treeRoot.style.listStyle = "none";
+    treeRoot.style.padding = "0";
+    treeRoot.style.margin = "0";
+    const sceneItem = document.createElement("li");
+    sceneItem.textContent = "Scene";
+    sceneItem.style.fontWeight = "700";
+    sceneItem.style.marginBottom = "4px";
+    const meshList = document.createElement("ul");
+    meshList.style.listStyle = "none";
+    meshList.style.margin = "0";
+    meshList.style.paddingLeft = "14px";
+    const rowByValue = new Map();
+    const setSelected = (value) => {
+        rowByValue.forEach((row, key) => {
+            if (key === value) {
+                row.style.background = "#d1d5db";
+                row.style.color = "#111";
+            }
+            else {
+                row.style.background = "transparent";
+                row.style.color = "#222";
+            }
+        });
+    };
+    config.options.forEach((option) => {
+        const item = document.createElement("li");
+        const row = document.createElement("div");
+        row.textContent = option.label;
+        row.style.padding = "4px 6px";
+        row.style.borderRadius = "4px";
+        row.style.cursor = "pointer";
+        row.style.userSelect = "none";
+        row.style.color = "#222";
+        row.addEventListener("click", () => {
+            setSelected(option.value);
+            config.onChange?.(option.value);
+        });
+        rowByValue.set(option.value, row);
+        item.appendChild(row);
+        meshList.appendChild(item);
+    });
+    sceneItem.appendChild(meshList);
+    treeRoot.appendChild(sceneItem);
+    panel.appendChild(treeRoot);
+    if (config.selectedValue !== undefined) {
+        setSelected(config.selectedValue);
+    }
     return panel;
 }
 function addSlider(parent, config) {
@@ -49,11 +122,25 @@ function addSlider(parent, config) {
         controls[config.key] = Number(input.value);
         value.textContent = controls[config.key].toFixed(2);
     });
+    sliderBindings[config.key] = {
+        input,
+        valueText: value,
+    };
     wrapper.appendChild(label);
     wrapper.appendChild(input);
     parent.appendChild(wrapper);
 }
+function syncControlsToUi() {
+    Object.keys(sliderBindings).forEach((key) => {
+        const binding = sliderBindings[key];
+        if (!binding) {
+            return;
+        }
+        binding.input.value = String(controls[key]);
+        binding.valueText.textContent = controls[key].toFixed(2);
+    });
+}
 function addSliders(parent, configs) {
     configs.forEach((config) => addSlider(parent, config));
 }
-export { controls, createControlsPanel, addSlider, addSliders };
+export { controls, createTransformControlPanel, createMeshSelectPanel, syncControlsToUi, addSlider, addSliders };

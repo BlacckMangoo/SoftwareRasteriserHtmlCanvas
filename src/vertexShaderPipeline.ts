@@ -1,5 +1,5 @@
 
-import { controls, createControlsPanel,addSliders } from "./ui.js";
+import { controls, createTransformControlPanel, createMeshSelectPanel, syncControlsToUi, addSliders } from "./ui.js";
 
 const canvas = document.getElementById("canvas") as HTMLCanvasElement;
 const ctx = canvas.getContext("2d");
@@ -54,8 +54,8 @@ interface Matrix3{
     r3: Vec3;
 }
 
-interface UIState {
-     selectedMeshIndex: number;
+interface UiState {
+    selectedMeshIndex: number;
 }
 
 interface Transform {
@@ -67,6 +67,7 @@ interface Transform {
 
 
 interface Mesh {
+    name    : string;
     vertices: Point[];
     edgesData : Array<[number, number]>;
     transform: Transform;
@@ -142,21 +143,6 @@ function GranShmidtProcess( v : Vec3) : Matrix3 {
     // where e1 is the normalised input vector and e2 and e3 are the orthogonal vectors generated from the process
 
 }
-
-const identityMatrix4: Matrix4 = {
-    r1: { x: 1, y: 0, z: 0, w: 0 },
-    r2: { x: 0, y: 1, z: 0, w: 0 },
-    r3: { x: 0, y: 0, z: 1, w: 0 },
-    r4: { x: 0, y: 0, z: 0, w: 1 },
-};
-
-const identityMatrix3: Matrix3 = {
-    r1: { x: 1, y: 0, z: 0 },
-    r2: { x: 0, y: 1, z: 0 },
-    r3: { x: 0, y: 0, z: 1 },
-};
-
-
 
 function LogMatrix4(matrix: Matrix4) {
     console.log(
@@ -461,7 +447,8 @@ function ScaleVec3(vec: Vec3, scale: Vec3): Vec3 {
 }
 
 
-const controlsPanel = createControlsPanel();
+const controlsPanel = createTransformControlPanel();
+
 
 
 addSliders(controlsPanel, [
@@ -511,12 +498,14 @@ const cam : Camera = {
 };
 
 const cubeMESH: Mesh = {
+    name : "cubeA",
     vertices: cubeVertexData,
     edgesData: cubeEdges,
     transform: CubeTransform
 };
 
 const anotherCubeMESH: Mesh = {
+    name : "cubeB",
     vertices: cubeVertexData,
     edgesData: cubeEdges,
     transform: anotherCubeTransform
@@ -525,6 +514,10 @@ const anotherCubeMESH: Mesh = {
 const scene : Scene = {
     cam,
     meshes : [cubeMESH, anotherCubeMESH]
+};
+
+const uiState: UiState = {
+    selectedMeshIndex: 0,
 };
 
 function DrawMesh(mesh: Mesh, cam: Camera ) {
@@ -564,17 +557,55 @@ function DrawMesh(mesh: Mesh, cam: Camera ) {
         projectedPoints.forEach(point => {
             drawPoint(point);
         });
-
-       
-
 }
 
+function updateMeshTransformFromUI(mesh: Mesh) {
+    mesh.transform.rotAngle = controls.rotDeg * (Math.PI / 180);
+    mesh.transform.rotationAxis = { x: controls.rotAxisX, y: controls.rotAxisY, z: controls.rotAxisZ };
+    mesh.transform.scale = { x: controls.scaleX, y: controls.scaleY, z: controls.scaleZ };
+    mesh.transform.translation = { x: controls.translateX, y: controls.translateY, z: controls.translateZ };
+}
+
+function updateUIFromMeshTransform(mesh: Mesh) {
+    controls.rotDeg = mesh.transform.rotAngle * (180 / Math.PI);
+    controls.rotAxisX = mesh.transform.rotationAxis.x;
+    controls.rotAxisY = mesh.transform.rotationAxis.y;
+    controls.rotAxisZ = mesh.transform.rotationAxis.z;
+    controls.scaleX = mesh.transform.scale.x;
+    controls.scaleY = mesh.transform.scale.y;
+    controls.scaleZ = mesh.transform.scale.z;
+    controls.translateX = mesh.transform.translation.x;
+    controls.translateY = mesh.transform.translation.y;
+    controls.translateZ = mesh.transform.translation.z;
+    syncControlsToUi();
+}
+
+updateUIFromMeshTransform(scene.meshes[uiState.selectedMeshIndex]);
+
+createMeshSelectPanel({
+    options: scene.meshes.map((mesh, index) => ({ label: mesh.name, value: index })),
+    selectedValue: uiState.selectedMeshIndex,
+    onChange: (value) => {
+        const previousMesh = scene.meshes[uiState.selectedMeshIndex];
+        if (previousMesh) {
+            updateMeshTransformFromUI(previousMesh);
+        }
+
+        uiState.selectedMeshIndex = value;
+
+        const nextMesh = scene.meshes[uiState.selectedMeshIndex];
+        if (nextMesh) {
+            updateUIFromMeshTransform(nextMesh);
+        }
+    },
+});
 
 
 function renderScene(scene: Scene, ctx: CanvasRenderingContext2D) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     scene.meshes.forEach(mesh => DrawMesh(mesh, scene.cam,));
 }
+
 
 
 const cameraForward: Vec3 = { x: 0, y: 0, z: -1 };
@@ -585,7 +616,10 @@ const cameraForward: Vec3 = { x: 0, y: 0, z: -1 };
 const timestart = performance.now();
 setInterval(() => {
     if (ctx) {
-        
+        const selectedMesh = scene.meshes[uiState.selectedMeshIndex];
+        if (selectedMesh) {
+            updateMeshTransformFromUI(selectedMesh);
+        }
         renderScene(scene, ctx);
 
  }

@@ -1,4 +1,4 @@
-import { createControlsPanel, addSliders } from "./ui.js";
+import { controls, createTransformControlPanel, createMeshSelectPanel, syncControlsToUi, addSliders } from "./ui.js";
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 canvas.width = window.innerWidth;
@@ -61,17 +61,6 @@ function GranShmidtProcess(v) {
     //{ [ e1.z e2.z e3.z ]} 
     // where e1 is the normalised input vector and e2 and e3 are the orthogonal vectors generated from the process
 }
-const identityMatrix4 = {
-    r1: { x: 1, y: 0, z: 0, w: 0 },
-    r2: { x: 0, y: 1, z: 0, w: 0 },
-    r3: { x: 0, y: 0, z: 1, w: 0 },
-    r4: { x: 0, y: 0, z: 0, w: 1 },
-};
-const identityMatrix3 = {
-    r1: { x: 1, y: 0, z: 0 },
-    r2: { x: 0, y: 1, z: 0 },
-    r3: { x: 0, y: 0, z: 1 },
-};
 function LogMatrix4(matrix) {
     console.log(`${matrix.r1.x} ${matrix.r1.y} ${matrix.r1.z} ${matrix.r1.w}\n` +
         `${matrix.r2.x} ${matrix.r2.y} ${matrix.r2.z} ${matrix.r2.w}\n` +
@@ -329,7 +318,7 @@ function ScaleVec3(vec, scale) {
         z: vec.z * scale.z,
     };
 }
-const controlsPanel = createControlsPanel();
+const controlsPanel = createTransformControlPanel();
 addSliders(controlsPanel, [
     { key: "rotDeg", label: "Rotation (deg)", min: 0, max: 360, step: 1 },
     { key: "rotAxisX", label: "Rotation Axis X", min: -1, max: 1, step: 0.01 },
@@ -368,11 +357,13 @@ const cam = {
     ar: aspectRatio
 };
 const cubeMESH = {
+    name: "cubeA",
     vertices: cubeVertexData,
     edgesData: cubeEdges,
     transform: CubeTransform
 };
 const anotherCubeMESH = {
+    name: "cubeB",
     vertices: cubeVertexData,
     edgesData: cubeEdges,
     transform: anotherCubeTransform
@@ -380,6 +371,9 @@ const anotherCubeMESH = {
 const scene = {
     cam,
     meshes: [cubeMESH, anotherCubeMESH]
+};
+const uiState = {
+    selectedMeshIndex: 0,
 };
 function DrawMesh(mesh, cam) {
     // we First Scale the Points in Thier Local Space 
@@ -405,6 +399,41 @@ function DrawMesh(mesh, cam) {
         drawPoint(point);
     });
 }
+function updateMeshTransformFromUI(mesh) {
+    mesh.transform.rotAngle = controls.rotDeg * (Math.PI / 180);
+    mesh.transform.rotationAxis = { x: controls.rotAxisX, y: controls.rotAxisY, z: controls.rotAxisZ };
+    mesh.transform.scale = { x: controls.scaleX, y: controls.scaleY, z: controls.scaleZ };
+    mesh.transform.translation = { x: controls.translateX, y: controls.translateY, z: controls.translateZ };
+}
+function updateUIFromMeshTransform(mesh) {
+    controls.rotDeg = mesh.transform.rotAngle * (180 / Math.PI);
+    controls.rotAxisX = mesh.transform.rotationAxis.x;
+    controls.rotAxisY = mesh.transform.rotationAxis.y;
+    controls.rotAxisZ = mesh.transform.rotationAxis.z;
+    controls.scaleX = mesh.transform.scale.x;
+    controls.scaleY = mesh.transform.scale.y;
+    controls.scaleZ = mesh.transform.scale.z;
+    controls.translateX = mesh.transform.translation.x;
+    controls.translateY = mesh.transform.translation.y;
+    controls.translateZ = mesh.transform.translation.z;
+    syncControlsToUi();
+}
+updateUIFromMeshTransform(scene.meshes[uiState.selectedMeshIndex]);
+createMeshSelectPanel({
+    options: scene.meshes.map((mesh, index) => ({ label: mesh.name, value: index })),
+    selectedValue: uiState.selectedMeshIndex,
+    onChange: (value) => {
+        const previousMesh = scene.meshes[uiState.selectedMeshIndex];
+        if (previousMesh) {
+            updateMeshTransformFromUI(previousMesh);
+        }
+        uiState.selectedMeshIndex = value;
+        const nextMesh = scene.meshes[uiState.selectedMeshIndex];
+        if (nextMesh) {
+            updateUIFromMeshTransform(nextMesh);
+        }
+    },
+});
 function renderScene(scene, ctx) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     scene.meshes.forEach(mesh => DrawMesh(mesh, scene.cam));
@@ -415,6 +444,10 @@ const cameraBasis = CameraBasis(cam);
 const timestart = performance.now();
 setInterval(() => {
     if (ctx) {
+        const selectedMesh = scene.meshes[uiState.selectedMeshIndex];
+        if (selectedMesh) {
+            updateMeshTransformFromUI(selectedMesh);
+        }
         renderScene(scene, ctx);
     }
 }, 10);
