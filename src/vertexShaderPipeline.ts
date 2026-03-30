@@ -2,6 +2,7 @@ import { initialiseUi } from "./ui.js";
 import { getCameraState, getMeshTransformState } from "./stateManager.js";
 import { CameraBasis, multiplyMatrix3Vec3, perspectiveProjection, RotateAroundArbitraryAxisMatrix, ScaleVec3, TranslateVec3 } from "./math.js";
 import { Vec3} from "./math.js";
+import { Point,Mesh,cubeMESH,quadMesh,triangleMESH } from "./primitiveData.js";
 
 const canvas = document.getElementById("canvas") as HTMLCanvasElement;
 const ctx = canvas.getContext("2d");
@@ -19,12 +20,6 @@ interface Color {
     g: number;
     b: number;
     a: number;
-}
-
-interface Point {
-    x: number;
-    y: number;
-    z: number;
 }
 
 
@@ -46,11 +41,7 @@ interface Transform {
 }
 
 
-interface Mesh {
-    name    : string;
-    vertices: Point[];
-    triangleIndicesData: Array<[number, number, number]>;
-}
+
 
 interface Scene {
     cam : Camera;
@@ -154,11 +145,13 @@ function drawLine(p1: Point, p2: Point, col: Color, depthBias: number = 0.0001):
             break;
         }
 
+        // if the line is very steep we want to give it a higher bias so that it is more likely to be drawn on top of the filled triangle edges ( which are drawn with a smaller bias ) and thus avoid gaps between the edges and the filled triangle
         const e2 = error * 2;
         if (e2 > -dy) {
             error -= dy;
             x0 += sx;
         }
+
         if (e2 < dx) {
             error += dx;
             y0 += sy;
@@ -169,108 +162,21 @@ function drawLine(p1: Point, p2: Point, col: Color, depthBias: number = 0.0001):
 
 
 
-const cubeVertexData : Point[] = [
-    // front face (z = 0.5)
-    { x: -0.5, y: -0.5, z: 0.5 },
-    { x: 0.5, y: -0.5, z: 0.5 },
-    { x: 0.5, y: 0.5, z: 0.5 },
-    { x: -0.5, y: 0.5, z: 0.5 },
-    // back face (z = -0.5)
-    { x: -0.5, y: -0.5, z: -0.5 },
-    { x: 0.5, y: -0.5, z: -0.5 },
-    { x: 0.5, y: 0.5, z: -0.5 },
-    { x: -0.5, y: 0.5, z: -0.5 },
 
-    //side faces
-    { x: -0.5, y: -0.5, z: 0.5 },
-    { x: -0.5, y: 0.5, z: 0.5 },
-    { x: -0.5, y: 0.5, z: -0.5 },
-    { x: -0.5, y: -0.5, z: -0.5 },
-
-    { x: 0.5, y: -0.5, z: 0.5 },
-    { x: 0.5, y: 0.5, z: 0.5 },
-    { x: 0.5, y: 0.5, z: -0.5 },
-    { x: 0.5, y: -0.5, z: -0.5 },
-
-    // top face
-    { x: -0.5, y: 0.5, z: 0.5 },
-    { x: 0.5, y: 0.5, z: 0.5 },
-    { x: 0.5, y: 0.5, z: -0.5 },
-    { x: -0.5, y: 0.5, z: -0.5 },
-
-    // bottom face
-    { x: -0.5, y: -0.5, z: 0.5 },
-    { x: 0.5, y: -0.5, z: 0.5 },
-    { x: 0.5, y: -0.5, z: -0.5 },
-    { x: -0.5, y: -0.5, z: -0.5 },
-];
-
-const cubeInitialTransformState = {
-    position: { x: 0, y: 0, z: 0 },
-    rotationAxis: { x: 0, y: 1, z: 0 },
-    scale: { x: 1, y: 1, z: 1 },
-    rotationAngle: 0,
-};
-
-const TriangleVertexData: Point[] = [
-    { x: 0, y: 0.5, z: 0 },
-    { x: -0.5, y: -0.5, z: 0 },
-    { x: 0.5, y: -0.5, z: 0 }
-];
-
-const quadVertexData: Point[] = [
-    { x: -0.5, y: 0.5, z: 0 },
-    { x: -0.5, y: -0.5, z: 0 },
-    { x: 0.5, y: -0.5, z: 0 },
-    { x: 0.5, y: 0.5, z: 0 }
-];
-
-const quadMesh : Mesh = {
-    name : "quadA",
-    vertices: quadVertexData,
-    triangleIndicesData: [
-        [0, 1, 2],
-        [0, 2, 3]
-    ]
-};
-
-const cubeMESH: Mesh = {
-    name : "cubeA",
-    vertices: cubeVertexData,
-    triangleIndicesData: [
-        [0, 1, 2],
-        [0, 2, 3],
-        [4, 5, 6],
-        [4, 6, 7],
-        [0, 4, 7],
-        [0, 7, 3],
-        [1, 5, 6],
-        [1, 6, 2],
-        [3, 7, 6],
-        [3, 6, 2],
-        [0, 4, 5],
-        [0, 5, 1]
-    ]
-};
-
-const triangleMESH: Mesh = {
-    name : "triangleA",
-    vertices: TriangleVertexData,
-    triangleIndicesData: [
-        [0, 1, 2]
-    ]
+const defaultCameraState = {
+    position: {
+        x: 0, y: 0, z: 5,
+    },
+    lookAt : { x: 0, y: 0, z: 0 },
+    up : { x: 0, y: 1, z: 0 },
+    fov : 60,
+    near : 0.1,
+    far : 100,
+    ar : aspectRatio
 };
 
 const scene : Scene = {
-    cam: {
-        position: { x: 0, y: 0, z: 5 },
-        lookAt: { x: 0, y: 0, z: 0 },
-        up: { x: 0, y: 1, z: 0 },
-        near: 0.1,
-        far: 1000,
-        fov: 45,
-        ar: aspectRatio,
-    },
+    cam : defaultCameraState,
     meshes : [cubeMESH, triangleMESH, quadMesh]
 };
 
@@ -414,21 +320,28 @@ function RasteriseTriangle(p1: Point, p2: Point, p3: Point, col: Color) {
     for(let x = clampedMinX; x <= clampedMaxX; x++) {
         for(let y = clampedMinY; y <= clampedMaxY; y++) {
             const point: Point = { x, y, z: 0 };
-            const areaABC = edgeFunction(p1, p2, p3);
+            const areaABC = edgeFunction(p1, p2, p3); //cross product of AB And AC gives area of triangle ABC ( with sign ) and 
+            // also tells us the winding of the triangle  clockwise or counterclockwise )
             const areaPBC = edgeFunction(point, p2, p3);
             const areaAPC = edgeFunction(p1, point, p3);
             const areaABP = edgeFunction(p1, p2, point);
 
-            //depth testing
+            // barycentric interpolation to find the z value at this point
+
             const w1 = areaPBC / areaABC;
             const w2 = areaAPC / areaABC;
             const w3 = areaABP / areaABC;
             const z = w1 * p1.z + w2 * p2.z + w3 * p3.z;
 
-            const hasSameWinding = (areaABC >= 0 && areaPBC >= 0 && areaAPC >= 0 && areaABP >= 0) ||
+            // check if point is inside the triangle 
+            // if the point is on same side of all edges then its inside the triangle 
+
+        
+            //ie if edge func is positive for all edges or netive for all edges 
+            const isInsideTriangle = (areaABC >= 0 && areaPBC >= 0 && areaAPC >= 0 && areaABP >= 0) ||
                 (areaABC < 0 && areaPBC <= 0 && areaAPC <= 0 && areaABP <= 0);
 
-            if (hasSameWinding) {
+            if (isInsideTriangle) {
                 const index = y * canvas.width + x;
                 if (z < depthBuffer[index]) {
                     depthBuffer[index] = z;
