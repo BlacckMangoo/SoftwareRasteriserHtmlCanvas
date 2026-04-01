@@ -1,4 +1,13 @@
 import { ensureMeshStates, getCameraState, getMeshTransformState, getUIState, meshes, setCameraState, setMeshTransformState, setUIState } from "./stateManager.js";
+export const defaultCameraState = {
+    position: { x: 0, y: 0, z: 7 },
+    lookAt: { x: 0, y: 0, z: 0 },
+    up: { x: 0, y: 1, z: 0 },
+    far: 1000,
+    near: 0.1,
+    fov: 60,
+    ar: 1
+};
 const getRoot = () => {
     let root = document.getElementById("ui-root");
     if (root) {
@@ -39,15 +48,76 @@ function createPanelSection(title) {
             input.max = String(max);
             input.step = String(step);
             input.value = String(initialValue);
+            const controlRow = document.createElement("div");
+            controlRow.style.cssText = "display:flex;align-items:center;gap:8px;";
+            input.style.flex = "1";
             const readout = document.createElement("span");
             readout.textContent = String(initialValue);
-            readout.style.marginLeft = "10px";
+            readout.style.minWidth = "52px";
+            const playButton = document.createElement("button");
+            playButton.type = "button";
+            playButton.textContent = "Play";
+            playButton.style.padding = "2px 8px";
+            playButton.style.cursor = "pointer";
+            let oscillationFrameId = null;
+            let lastTimestamp = 0;
+            let direction = 1;
+            const valueSpeedPerSecond = (max - min) / 4;
+            const stopOscillation = () => {
+                if (oscillationFrameId === null) {
+                    return;
+                }
+                cancelAnimationFrame(oscillationFrameId);
+                oscillationFrameId = null;
+                lastTimestamp = 0;
+                playButton.textContent = "Play";
+            };
+            const startOscillation = () => {
+                if (oscillationFrameId !== null) {
+                    return;
+                }
+                playButton.textContent = "Pause";
+                const tick = (timestamp) => {
+                    if (!slider.isConnected) {
+                        stopOscillation();
+                        return;
+                    }
+                    if (lastTimestamp === 0) {
+                        lastTimestamp = timestamp;
+                    }
+                    const deltaSeconds = (timestamp - lastTimestamp) / 1000;
+                    lastTimestamp = timestamp;
+                    let nextValue = Number(input.value) + direction * valueSpeedPerSecond * deltaSeconds;
+                    if (nextValue >= max) {
+                        nextValue = max;
+                        direction = -1;
+                    }
+                    else if (nextValue <= min) {
+                        nextValue = min;
+                        direction = 1;
+                    }
+                    input.value = String(nextValue);
+                    readout.textContent = nextValue.toFixed(2);
+                    onChange(nextValue);
+                    oscillationFrameId = requestAnimationFrame(tick);
+                };
+                oscillationFrameId = requestAnimationFrame(tick);
+            };
             input.addEventListener("input", () => {
+                stopOscillation();
                 const value = Number(input.value);
                 readout.textContent = String(value);
                 onChange(value);
             });
-            slider.append(labelElement, input, readout);
+            playButton.addEventListener("click", () => {
+                if (oscillationFrameId === null) {
+                    startOscillation();
+                    return;
+                }
+                stopOscillation();
+            });
+            controlRow.append(input, readout, playButton);
+            slider.append(labelElement, controlRow);
             return addElement(slider);
         },
     };
@@ -102,7 +172,7 @@ function initialiseUi() {
             const current = getMeshTransformState(active);
             setMeshTransformState(active, { position: { ...current.position, y: value } });
         });
-        transformPanel.addSlider("Pos Z", -10, 10, 0.1, state.position.z, (value) => {
+        transformPanel.addSlider("Pos Z", 5, 10, 0.1, state.position.z, (value) => {
             const active = getUIState().selectedMesh;
             if (!active)
                 return;
@@ -184,7 +254,7 @@ function initialiseUi() {
         const cam = getCameraState();
         setCameraState({ position: { ...cam.position, y: value } });
     });
-    cameraPanel.addSlider("Cam Z", -20, 20, 0.1, getCameraState().position.z, (value) => {
+    cameraPanel.addSlider("Cam Z", 5, 10, 0.1, getCameraState().position.z, (value) => {
         const cam = getCameraState();
         setCameraState({ position: { ...cam.position, z: value } });
     });
@@ -206,7 +276,11 @@ function initialiseUi() {
             return;
         }
         meshNames = nextMeshNames;
-        if (meshNames.length > 0 && !getUIState().selectedMesh) {
+        const selectedMesh = getUIState().selectedMesh;
+        if (meshNames.length === 0) {
+            setUIState({ selectedMesh: null });
+        }
+        else if (!selectedMesh || !meshNames.includes(selectedMesh)) {
             setUIState({ selectedMesh: meshNames[0] });
         }
         renderMeshPanel();

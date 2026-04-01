@@ -58,6 +58,15 @@ export function ensureMeshStates(meshNames) {
         }
     });
 }
+export function syncMeshStates(meshNames) {
+    const active = new Set(meshNames);
+    Object.keys(meshes).forEach((meshName) => {
+        if (!active.has(meshName)) {
+            delete meshes[meshName];
+        }
+    });
+    ensureMeshStates(meshNames);
+}
 export function setMeshTransformState(meshName, newState) {
     if (!meshes[meshName]) {
         meshes[meshName] = createDefaultTransform();

@@ -44,6 +44,8 @@ export function dotProduct(a: Vec3, b: Vec3): number {
     return a.x * b.x + a.y * b.y + a.z * b.z;
 }
 
+
+
 export function normalise(v: Vec3): Vec3 {
     const length = Math.sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
     return {

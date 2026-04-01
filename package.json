@@ -1,0 +1,10 @@
+{
+  "devDependencies": {
+    "@types/node": "^25.5.0"
+  },
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "gen" : " node dist/assetLoader.js"
+  }
+}

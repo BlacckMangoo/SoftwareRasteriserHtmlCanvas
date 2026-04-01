@@ -1,8 +1,10 @@
-import { initialiseUi } from "./ui.js";
-import { getCameraState, getMeshTransformState } from "./stateManager.js";
+import { defaultCameraState, initialiseUi } from "./ui.js";
+import { getCameraState, getMeshTransformState, syncMeshStates } from "./stateManager.js";
 import { CameraBasis, multiplyMatrix3Vec3, perspectiveProjection, RotateAroundArbitraryAxisMatrix, ScaleVec3, TranslateVec3 } from "./math.js";
 import { Vec3} from "./math.js";
 import { Point,Mesh,cubeMESH,quadMesh,triangleMESH } from "./primitiveData.js";
+import { allLoadedObjs } from "./loadedObj.js";
+import { get } from "node:http";
 
 const canvas = document.getElementById("canvas") as HTMLCanvasElement;
 const ctx = canvas.getContext("2d");
@@ -41,12 +43,16 @@ interface Transform {
 }
 
 
-
-
 interface Scene {
     cam : Camera;
     meshes : Mesh[];
 }
+
+const scene : Scene = {
+    cam : defaultCameraState,
+    meshes : [cubeMESH, ...allLoadedObjs]
+};
+
 
 
 function convertPointFromNdcToScreenSpace(point: Point): Point {
@@ -79,7 +85,6 @@ function clearDepthBuffer(): void {
     }
 }
 
-
 // Writes to the frame buffer
 function setPixel(x: number, y: number, col: Color): void {
     if (!Number.isFinite(x) || !Number.isFinite(y)) {
@@ -101,15 +106,10 @@ function setPixel(x: number, y: number, col: Color): void {
 
 }
 
-
-
-
-function drawPoint(p: Point) {
-    const point = convertPointFromNdcToScreenSpace(p);
-    setPixel(point.x, point.y, { r: 255, g: 255, b: 255, a: 255 });
-}
-
-
+// function drawPoint(p: Point) {
+//     const point = convertPointFromNdcToScreenSpace(p);
+//     setPixel(point.x, point.y, { r: 255, g: 255, b: 255, a: 255 });
+// }
 
 function drawLine(p1: Point, p2: Point, col: Color, depthBias: number = 0.0001): void {
     const point1 = convertPointFromNdcToScreenSpace(p1);
@@ -160,27 +160,6 @@ function drawLine(p1: Point, p2: Point, col: Color, depthBias: number = 0.0001):
     }
 }
 
-
-
-
-const defaultCameraState = {
-    position: {
-        x: 0, y: 0, z: 5,
-    },
-    lookAt : { x: 0, y: 0, z: 0 },
-    up : { x: 0, y: 1, z: 0 },
-    fov : 60,
-    near : 0.1,
-    far : 100,
-    ar : aspectRatio
-};
-
-const scene : Scene = {
-    cam : defaultCameraState,
-    meshes : [cubeMESH, triangleMESH, quadMesh]
-};
-
-
 const getRenderCamera = (): Camera => {
     const camState = getCameraState();
     const lookAt = updateCameraLookAt(camState.position);
@@ -204,7 +183,6 @@ function updateCameraLookAt(position: Vec3): Vec3 {
 
     };
 }
-
 
 function DrawMesh(mesh: Mesh, transform: Transform, cam: Camera ) {
 
@@ -255,12 +233,10 @@ function DrawMesh(mesh: Mesh, transform: Transform, cam: Camera ) {
         drawLine(projectedPoints[c], projectedPoints[a], edgeColor);
     });
 
-    projectedPoints.forEach(point => {
-        drawPoint(point);
-    });
+    // projectedPoints.forEach(point => {
+    //     drawPoint(point);
+    // });
 }
-
-
 
 function getTransformForMesh(meshName: string): Transform {
     const transformState = getMeshTransformState(meshName);
@@ -353,7 +329,6 @@ function RasteriseTriangle(p1: Point, p2: Point, p3: Point, col: Color) {
 
 }
 
-
 function renderScene(scene: Scene, ctx: CanvasRenderingContext2D) {
     const renderCam = getRenderCamera();
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -361,14 +336,14 @@ function renderScene(scene: Scene, ctx: CanvasRenderingContext2D) {
     clearDepthBuffer();
     scene.meshes.forEach((mesh) => drawMeshFromState(mesh, renderCam));
 }
-
-
 initialiseUi();
 
 
+
+syncMeshStates(scene.meshes.map((mesh) => mesh.name));
 setInterval(() => {
     if (ctx) {
         renderScene(scene, ctx);
         DrawFrameBuffer();
  }
-},10);
+},1);
