@@ -373,8 +373,6 @@ function renderScene(scene: Scene, ctx: CanvasRenderingContext2D) {
 
 initialiseUi();
 
-
-
 syncMeshStates(scene.meshes.map((mesh) => mesh.name));
 setInterval(() => {
     if (ctx) {
