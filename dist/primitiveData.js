@@ -41,7 +41,7 @@ const quadVertexData = [
     { x: 0.5, y: 0.5, z: 0 }
 ];
 const quadMesh = {
-    name: "quadA",
+    name: "quad",
     vertices: quadVertexData,
     triangleIndicesData: [
         [0, 1, 2],
@@ -55,21 +55,21 @@ const quadMesh = {
     ]
 };
 const cubeMESH = {
-    name: "cubeA",
+    name: "cube",
     vertices: cubeVertexData,
     triangleIndicesData: [
         [0, 1, 2],
         [0, 2, 3],
-        [4, 5, 6],
-        [4, 6, 7],
+        [4, 6, 5],
+        [4, 7, 6],
         [8, 9, 10],
         [8, 10, 11],
-        [12, 13, 14],
-        [12, 14, 15],
+        [12, 14, 13],
+        [12, 15, 14],
         [16, 17, 18],
         [16, 18, 19],
-        [20, 21, 22],
-        [20, 22, 23]
+        [20, 22, 21],
+        [20, 23, 22]
     ],
     uvData: [
         [0, 1],
@@ -99,7 +99,7 @@ const cubeMESH = {
     ]
 };
 const triangleMESH = {
-    name: "triangleA",
+    name: "triangle",
     vertices: TriangleVertexData,
     triangleIndicesData: [
         [0, 1, 2]

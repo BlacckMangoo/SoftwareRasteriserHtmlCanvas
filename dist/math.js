@@ -121,6 +121,10 @@ export function perspectiveProjection(point, cam) {
         z: projectionMatrix.r3.x * pointVec4.x + projectionMatrix.r3.y * pointVec4.y + projectionMatrix.r3.z * pointVec4.z + projectionMatrix.r3.w * pointVec4.w,
         w: projectionMatrix.r4.x * pointVec4.x + projectionMatrix.r4.y * pointVec4.y + projectionMatrix.r4.z * pointVec4.z + projectionMatrix.r4.w * pointVec4.w,
     };
+    // before perspective devide , we can check if point is behind camera ie w < 0 and clip it 
+    if (projectedVec4.w < 0) {
+        return { x: NaN, y: NaN, z: NaN }; // or some other way to indicate it's not visible
+    }
     return {
         x: projectedVec4.x / projectedVec4.w,
         y: projectedVec4.y / projectedVec4.w,

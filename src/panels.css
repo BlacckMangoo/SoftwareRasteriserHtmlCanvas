@@ -63,6 +63,29 @@ body {
     color: var(--ui-text);
 }
 
+.ui-toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.ui-toggle-label {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    color: var(--ui-text);
+}
+
+.ui-toggle-input {
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    accent-color: var(--ui-accent);
+    flex: 0 0 auto;
+}
+
 .ui-control-row {
     display: grid;
     grid-template-columns: 1fr auto auto;

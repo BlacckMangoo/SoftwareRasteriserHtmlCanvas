@@ -1,9 +1,9 @@
 import { initialiseUi } from "./ui.js";
-import { getCameraState } from "./stateManager.js";
+import { getCameraState, getLightingState, getRenderState } from "./stateManager.js";
 import { mesheTransforms, syncMeshStates } from "./transform.js";
 import type { MeshTransformState } from "./transform.js";
 import { createCam, updateCameraLookAt } from "./camera.js";
-import { CameraBasis, multiplyMatrix3Vec3, perspectiveProjection, RotateAroundArbitraryAxisMatrix, ScaleVec3, TranslateVec3 } from "./math.js";
+import { CameraBasis, crossProduct, dotProduct, multiplyMatrix3Vec3, normalise, perspectiveProjection, RotateAroundArbitraryAxisMatrix, ScaleVec3, TranslateVec3 } from "./math.js";
 import { Point,Mesh } from "./primitiveData.js";
 import { textures } from "./loadedTextures.js";
 import type { Texture } from "./texture.js";
@@ -71,11 +71,10 @@ function clearFrameBuffer(col: Color): void {
 function clearDepthBuffer(): void {
     for (let i = 0; i < depthBuffer.length; i++) {
         depthBuffer[i] = Infinity; // set all depths to infinity (far away)
-
         // remember smaller z means that object is closer to the camera should be drawn in front of objects with larger z values
-
     }
 }
+
 
 // Writes to the frame buffer
 function setPixel(x: number, y: number, col: Color): void {
@@ -167,6 +166,14 @@ function meshHasValidUv(mesh: Mesh): boolean {
     return Array.isArray(mesh.uvData) && mesh.uvData.length === mesh.vertices.length;
 }
 
+function normaliseOrFallback(x: number, y: number, z: number, fallback: { x: number; y: number; z: number }) {
+    const lengthSq = x * x + y * y + z * z;
+    if (lengthSq < 1e-8) {
+        return fallback;
+    }
+    return normalise({ x, y, z });
+}
+
 function DrawMesh(mesh: Mesh, transform: MeshTransformState, cam: Camera ) {
 
 
@@ -178,6 +185,7 @@ function DrawMesh(mesh: Mesh, transform: MeshTransformState, cam: Camera ) {
     const rotatedPoints = scaledPoints.map(point => RotateAroundArbitraryAxisMatrix(point,
     transform.rotationAxis,
     transform.rotationAngle));
+    
     const translatedPoints = rotatedPoints.map(point => TranslateVec3(point, transform.position));
     // SCALE -> ROTATE -> TRANSLATE pipeline converts points from their local space to the world space 
 
@@ -191,21 +199,71 @@ function DrawMesh(mesh: Mesh, transform: MeshTransformState, cam: Camera ) {
 
     const cameraBasis = CameraBasis(cam);
     const pointsInCameraSpace = pointsShiftedSoCameraIsOrigin.map(point => multiplyMatrix3Vec3(cameraBasis, point));
+    
     // now we can observe that moving the camera in the z direction doesnt do anything , ie the points that are far away from the camera are not getting smaller with distance 
+
 
     // now as the final step , we need project the points in camera onto a 2d Screen ( in our example the screen is placed at z = 0 ) , camera is looking down the negative z axis and the projection plane is between the camera and the origin of the world space
     // we can think of this project as if shooting a way from the position of the camera to the point in camera space and finding where it intersects the plane z = 0 ( the screen )
 
     const projectedPoints = pointsInCameraSpace.map(point => perspectiveProjection(point, cam));
 
+
     const useTexture = meshHasValidUv(mesh);
 
-    mesh.triangleIndicesData.forEach(([a, b, c]) => {
-    const p1 = convertPointFromNdcToScreenSpace(projectedPoints[a]);
-    const p2 = convertPointFromNdcToScreenSpace(projectedPoints[b]);
-    const p3 = convertPointFromNdcToScreenSpace(projectedPoints[c]);
 
-    const col: Color = { r: 0, g: 0, b: 0, a: 255 };  
+    const lightingState = getLightingState();
+    const lightDir = normaliseOrFallback(
+        lightingState.lightDirection.x,
+        lightingState.lightDirection.y,
+        lightingState.lightDirection.z,
+        { x: 0, y: 0, z: -1 },
+    );
+    const ambient = Math.min(1, Math.max(0, lightingState.ambientStrength));
+
+    mesh.triangleIndicesData.forEach(([a, b, c]) => {
+    const camP1 = pointsInCameraSpace[a];
+    const camP2 = pointsInCameraSpace[b];
+    const camP3 = pointsInCameraSpace[c];
+
+    // Back-face culling 
+    const edge1 = {
+        x: camP2.x - camP1.x,
+        y: camP2.y - camP1.y,
+        z: camP2.z - camP1.z,
+    };
+    const edge2 = {
+        x: camP3.x - camP1.x,
+        y: camP3.y - camP1.y,
+        z: camP3.z - camP1.z,
+    };
+    const normal = crossProduct(edge1, edge2);
+    if (dotProduct(normal, camP1) >= 0) {
+        return;
+    }
+
+    const projectedP1 = projectedPoints[a];
+    const projectedP2 = projectedPoints[b];
+    const projectedP3 = projectedPoints[c];
+    if (
+        !Number.isFinite(projectedP1.x) || !Number.isFinite(projectedP1.y) || !Number.isFinite(projectedP1.z) ||
+        !Number.isFinite(projectedP2.x) || !Number.isFinite(projectedP2.y) || !Number.isFinite(projectedP2.z) ||
+        !Number.isFinite(projectedP3.x) || !Number.isFinite(projectedP3.y) || !Number.isFinite(projectedP3.z)
+    ) {
+        return;
+    }
+
+    const p1 = convertPointFromNdcToScreenSpace(projectedP1);
+    const p2 = convertPointFromNdcToScreenSpace(projectedP2);
+    const p3 = convertPointFromNdcToScreenSpace(projectedP3);
+
+    const faceNormal = normaliseOrFallback(normal.x, normal.y, normal.z, { x: 0, y: 0, z: 1 });
+    const diffuse = Math.max(0, dotProduct(faceNormal, lightDir));
+    const lighting = ambient + (1 - ambient) * diffuse;
+    const shade = Math.round(lighting * 255);
+  
+
+    const col: Color = { r: shade, g: shade, b: shade, a: 255 };
 
     // if mesh contains u,v data then set p.u and v 
     if (useTexture && mesh.uvData) {
@@ -217,15 +275,17 @@ function DrawMesh(mesh: Mesh, transform: MeshTransformState, cam: Camera ) {
         p3.v = mesh.uvData[c][1];
     }
 
-    RasteriseTriangle(p1, p2, p3, col, useTexture ? checkersTexture : undefined);
+    RasteriseTriangle(p1, p2, p3, col, useTexture ? checkersTexture : undefined, lighting);
 });
 
-    mesh.triangleIndicesData.forEach(([a, b, c]) => {
-        const edgeColor: Color = { r: 255, g: 255, b: 255, a: 255 };
-        drawLine(projectedPoints[a], projectedPoints[b], edgeColor);
-        drawLine(projectedPoints[b], projectedPoints[c], edgeColor);
-        drawLine(projectedPoints[c], projectedPoints[a], edgeColor);
-    });
+    if (getRenderState().drawWireframe) {
+        mesh.triangleIndicesData.forEach(([a, b, c]) => {
+            const edgeColor: Color = { r: 255, g: 255, b: 255, a: 255 };
+            drawLine(projectedPoints[a], projectedPoints[b], edgeColor);
+            drawLine(projectedPoints[b], projectedPoints[c], edgeColor);
+            drawLine(projectedPoints[c], projectedPoints[a], edgeColor);
+        });
+    }
 
     // projectedPoints.forEach(point => {
     //     drawPoint(point);
@@ -244,7 +304,9 @@ function edgeFunction(a: Point, b: Point, c: Point): number {
      
 }
 
-function RasteriseTriangle(p1: Point, p2: Point, p3: Point, col: Color , texture?: Texture) {
+function RasteriseTriangle(p1: Point, p2: Point, p3: Point, col: Color , texture?: Texture, shadeMultiplier: number = 1) {
+
+    
     // Implement triangle rasterisation using barycentric coordinates
 
     //step 1 : compute the bounding box of the triangle 
@@ -319,9 +381,9 @@ function RasteriseTriangle(p1: Point, p2: Point, p3: Point, col: Color , texture
                 const texY = Math.floor(clampedV * (texHeight - 1));
                 
                 const texIndex = (texY * texWidth + texX) * 4;
-                col.r = texData[texIndex];
-                col.g = texData[texIndex + 1];
-                col.b = texData[texIndex + 2];
+                col.r = texData[texIndex] * shadeMultiplier;
+                col.g = texData[texIndex + 1] * shadeMultiplier;
+                col.b = texData[texIndex + 2] * shadeMultiplier;
                 col.a = texData[texIndex + 3];
 
             }
@@ -339,12 +401,11 @@ function RasteriseTriangle(p1: Point, p2: Point, p3: Point, col: Color , texture
 
 }
 
-scene.addMesh("teapot.obj");
+scene.addMesh("cube");
 
 function renderScene(scene: Scene, ctx: CanvasRenderingContext2D) {
     const renderCam = getRenderCamera();
     scene.setCamera(renderCam);
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
     clearFrameBuffer({ r: 55, g: 55, b: 55, a: 225 });
     clearDepthBuffer();
     scene.meshes.forEach((mesh) => DrawMesh(mesh, mesheTransforms[mesh.name], scene.cam));
@@ -353,9 +414,24 @@ function renderScene(scene: Scene, ctx: CanvasRenderingContext2D) {
 initialiseUi();
 
 syncMeshStates(scene.meshes.map((mesh) => mesh.name));
+
+let fpsFrameCount = 0;
+let fpsLastSampleTime = performance.now();
+
 setInterval(() => {
     if (ctx) {
         renderScene(scene, ctx);
         DrawFrameBuffer();
+
+        fpsFrameCount += 1;
+        const now = performance.now();
+        const elapsedMs = now - fpsLastSampleTime;
+
+        if (elapsedMs >= 1000) {
+            const fps = (fpsFrameCount * 1000) / elapsedMs;
+            console.log(`FPS: ${fps.toFixed(1)}`);
+            fpsFrameCount = 0;
+            fpsLastSampleTime = now;
+        }
  }
-},10);
+},4);

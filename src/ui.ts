@@ -1,5 +1,5 @@
 
-import { getCameraState, getMeshTransformState, getUIState, setCameraState, setMeshTransformState, setUIState } from "./stateManager.js";
+import { getCameraState, getLightingState, getMeshTransformState, getRenderState, getUIState, setCameraState, setLightingState, setMeshTransformState, setRenderState, setUIState } from "./stateManager.js";
 import { ensureMeshStates, mesheTransforms } from "./transform.js";
 
 const getRoot = (): HTMLDivElement => {
@@ -17,6 +17,7 @@ interface PanelSection {
     element: HTMLDivElement;
     addElement: <TElement extends HTMLElement>(element: TElement) => TElement;
     addSlider: (label: string, min: number, max: number, step: number, initialValue: number, onChange: (value: number) => void) => HTMLDivElement;
+    addToggle: (label: string, initialValue: boolean, onChange: (value: boolean) => void) => HTMLDivElement;
 }
 
 function createPanelSection(title: string): PanelSection {
@@ -137,6 +138,26 @@ function createPanelSection(title: string): PanelSection {
             slider.append(labelElement, controlRow);
             return addElement(slider);
         },
+        addToggle: (label, initialValue, onChange) => {
+            const row = document.createElement("div");
+            row.className = "ui-toggle-row";
+
+            const labelElement = document.createElement("label");
+            labelElement.className = "ui-toggle-label";
+            labelElement.textContent = label;
+
+            const input = document.createElement("input");
+            input.type = "checkbox";
+            input.className = "ui-toggle-input";
+            input.checked = initialValue;
+
+            input.addEventListener("change", () => {
+                onChange(input.checked);
+            });
+
+            row.append(labelElement, input);
+            return addElement(row);
+        },
     };
 }
 
@@ -160,6 +181,8 @@ function initialiseUi(): void {
 
     const meshPanel = createPanelSection("Meshes");
     const cameraPanel = createPanelSection("Camera");
+    const lightingPanel = createPanelSection("Lighting");
+    const renderPanel = createPanelSection("Render");
     const transformPanel = createPanelSection("Selected Mesh Transform");
 
     const renderTransformPanel = (): void => {
@@ -300,6 +323,33 @@ function initialiseUi(): void {
         const cam = getCameraState();
         cam.far = value;
         setCameraState(cam);
+    });
+
+    lightingPanel.addSlider("Light Dir X", -1, 1, 0.01, getLightingState().lightDirection.x, (value) => {
+        const lighting = getLightingState();
+        lighting.lightDirection.x = value;
+        setLightingState(lighting);
+    });
+    lightingPanel.addSlider("Light Dir Y", -1, 1, 0.01, getLightingState().lightDirection.y, (value) => {
+        const lighting = getLightingState();
+        lighting.lightDirection.y = value;
+        setLightingState(lighting);
+    });
+    lightingPanel.addSlider("Light Dir Z", -1, 1, 0.01, getLightingState().lightDirection.z, (value) => {
+        const lighting = getLightingState();
+        lighting.lightDirection.z = value;
+        setLightingState(lighting);
+    });
+    lightingPanel.addSlider("Ambient", 0, 1, 0.01, getLightingState().ambientStrength, (value) => {
+        const lighting = getLightingState();
+        lighting.ambientStrength = value;
+        setLightingState(lighting);
+    });
+
+    renderPanel.addToggle("Draw Wireframe", getRenderState().drawWireframe, (value) => {
+        const renderState = getRenderState();
+        renderState.drawWireframe = value;
+        setRenderState(renderState);
     });
 
     const syncMeshNamesFromGlobal = (): void => {
