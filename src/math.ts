@@ -156,7 +156,8 @@ export function CameraBasis(cam: Camera): Matrix3 {
     };
 }
 
-export function perspectiveProjection(point: Point, cam: Camera): Point {
+export function perspectiveProjectionBeforePerspectiveDevide
+(point: Point, cam: Camera): Vec4 {
     const fov = cam.fov * (Math.PI / 180);
     const f = 1 / Math.tan(fov / 2);
     const ar = cam.ar;
@@ -178,17 +179,8 @@ export function perspectiveProjection(point: Point, cam: Camera): Point {
         w: projectionMatrix.r4.x * pointVec4.x + projectionMatrix.r4.y * pointVec4.y + projectionMatrix.r4.z * pointVec4.z + projectionMatrix.r4.w * pointVec4.w,
     };
 
-    // before perspective devide , we can check if point is behind camera ie w < 0 and clip it 
 
-    if (projectedVec4.w < 0) {
-        return { x: NaN, y: NaN, z: NaN }; // or some other way to indicate it's not visible
-    }
-
-    return {
-        x: projectedVec4.x / projectedVec4.w,
-        y: projectedVec4.y / projectedVec4.w,
-        z: projectedVec4.z / projectedVec4.w,
-    };
+     return projectedVec4;
 }
 
 export function RotateAroundArbitraryAxisMatrix(input: Vec3, axis: Vec3, angle: number): Vec3 {

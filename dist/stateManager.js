@@ -4,7 +4,7 @@ export const uiState = {
     selectedMesh: null,
 };
 const lightingState = {
-    lightDirection: { x: 0.4, y: 0.8, z: -1 },
+    lightDirection: { x: 0.4, y: 0.8, z: 0.6 },
     ambientStrength: 0.15,
 };
 const renderState = {

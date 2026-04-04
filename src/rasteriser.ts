@@ -3,11 +3,11 @@ import { getCameraState, getLightingState, getRenderState } from "./stateManager
 import { mesheTransforms, syncMeshStates } from "./transform.js";
 import type { MeshTransformState } from "./transform.js";
 import { createCam, updateCameraLookAt } from "./camera.js";
-import { CameraBasis, crossProduct, dotProduct, multiplyMatrix3Vec3, normalise, perspectiveProjection, RotateAroundArbitraryAxisMatrix, ScaleVec3, TranslateVec3 } from "./math.js";
+import { CameraBasis, crossProduct, dotProduct, multiplyMatrix3Vec3, normalise, perspectiveProjectionBeforePerspectiveDevide, RotateAroundArbitraryAxisMatrix, ScaleVec3, TranslateVec3 } from "./math.js";
 import { Point,Mesh } from "./primitiveData.js";
 import { textures } from "./loadedTextures.js";
 import type { Texture } from "./texture.js";
-import type { Camera } from "./math.js";
+import type { Camera, Vec4 } from "./math.js";
 import { createScene } from "./scene.js";
 import type { Scene } from "./scene.js";
 
@@ -42,15 +42,18 @@ const checkersTexture: Texture = textures.checkers_png;
 
 function convertPointFromNdcToScreenSpace(point: Point): Point {
     
-    const ndcX = point.x;
-    const ndcy = point.y;
+    const ndcX = point.pos.x;
+    const ndcy = point.pos.y;
     return {
-        x: ((ndcX + 1) / 2) * canvas.width,
-        y: ((-ndcy + 1) / 2) * canvas.height,
-        z: point.z,
+       pos : {
+        x: (ndcX + 1) * 0.5 * canvas.width,
+        y: (1 - (ndcy + 1) * 0.5) * canvas.height, // flip y-axis for screen space
+        z: point.pos.z,
+       },
+       u : point.u,
+       v : point.v
     };
 }
-
 
 function DrawFrameBuffer() {
     if (ctx) {
@@ -75,8 +78,6 @@ function clearDepthBuffer(): void {
     }
 }
 
-
-// Writes to the frame buffer
 function setPixel(x: number, y: number, col: Color): void {
     if (!Number.isFinite(x) || !Number.isFinite(y)) {
         return;
@@ -102,10 +103,10 @@ function drawLine(p1: Point, p2: Point, col: Color, depthBias: number = 0.0001):
     const point1 = convertPointFromNdcToScreenSpace(p1);
     const point2 = convertPointFromNdcToScreenSpace(p2);
 
-    let x0 = Math.round(point1.x);
-    let y0 = Math.round(point1.y);
-    const x1 = Math.round(point2.x);
-    const y1 = Math.round(point2.y);
+    let x0 = Math.round(point1.pos.x);
+    let y0 = Math.round(point1.pos.y);
+    const x1 = Math.round(point2.pos.x);
+    const y1 = Math.round(point2.pos.y);
 
     const dx = Math.abs(x1 - x0);
     const dy = Math.abs(y1 - y0);
@@ -119,7 +120,7 @@ function drawLine(p1: Point, p2: Point, col: Color, depthBias: number = 0.0001):
     while (true) {
         if (x0 >= 0 && x0 < canvas.width && y0 >= 0 && y0 < canvas.height) {
             const t = totalSteps === 0 ? 0 : step / totalSteps;
-            const z = point1.z + (point2.z - point1.z) * t;
+            const z = point1.pos.z + (point2.pos.z - point1.pos.z) * t;
             const index = y0 * canvas.width + x0;
 
             // Edge is drawn only if it is on/closer than filled depth at this pixel.
@@ -162,24 +163,46 @@ const getRenderCamera = (): Camera => {
     };
 };
 
-function meshHasValidUv(mesh: Mesh): boolean {
-    return Array.isArray(mesh.uvData) && mesh.uvData.length === mesh.vertices.length;
+
+// CLIPPING 
+// so after perspective projection in the clip space we can have three cases for a set of points that form a triangle :
+//1 . all points in front of near plane ( in clip space w + z > 0 ) then we can just draw the triangle as is
+//2. all points behind the near plane ( in clip space w + z < 0 ) then we can discard the triangle and not draw it at all
+//3. two points in front of near plane and one behind ( in this case we will have to split the triangle into two triangles
+//  by finding the intersection of the triangle edges with the near plane and then draw the two new triangles that are formed by this
+//  intersection and the original points that are in front of the near plane )
+//4. if one point is in front of near plane and two are behind in 
+// in this case also we will have to find intersection and replace the original triangle with new clipped triangle 
+
+// when creating new triangles after clipping we will also have to recompute the uv values for the new vertices by interpolation 
+
+
+// finding intersection of line segment with near plane in clip space :
+// use paramteric form and find t 
+
+function intersectLineWithNearPlane(p1: Vec4, p2: Vec4): Vec4 {
+
+    // t = d1 / (d1 - d2) where d1 and d2 are the distances of p1 and p2 from the near plane in clip space ( ie d = w + z )
+    const t = (p1.w + p1.z) / ((p1.w + p1.z) - (p2.w + p2.z));
+    return {
+
+        // p(t) = p1 + t * (p2 - p1)
+        x: p1.x + t * (p2.x - p1.x),
+        y: p1.y + t * (p2.y - p1.y),
+        z: p1.z + t * (p2.z - p1.z),
+        w: p1.w + t * (p2.w - p1.w),
+    };
 }
 
-function normaliseOrFallback(x: number, y: number, z: number, fallback: { x: number; y: number; z: number }) {
-    const lengthSq = x * x + y * y + z * z;
-    if (lengthSq < 1e-8) {
-        return fallback;
-    }
-    return normalise({ x, y, z });
-}
 
 function DrawMesh(mesh: Mesh, transform: MeshTransformState, cam: Camera ) {
 
 
+  // kind of like the vertex shader
+
     // we First Scale the Points in Thier Local Space 
 
-    const scaledPoints = mesh.vertices.map(point => ScaleVec3(point, transform.scale));
+    const scaledPoints = mesh.vertices.map(point => ScaleVec3(point.pos, transform.scale));
     //then we rotate the points around an arbitrary axis (in this case the vector (1, 1, 1)) that goes through the origin of the world space
 
     const rotatedPoints = scaledPoints.map(point => RotateAroundArbitraryAxisMatrix(point,
@@ -206,19 +229,28 @@ function DrawMesh(mesh: Mesh, transform: MeshTransformState, cam: Camera ) {
     // now as the final step , we need project the points in camera onto a 2d Screen ( in our example the screen is placed at z = 0 ) , camera is looking down the negative z axis and the projection plane is between the camera and the origin of the world space
     // we can think of this project as if shooting a way from the position of the camera to the point in camera space and finding where it intersects the plane z = 0 ( the screen )
 
-    const projectedPoints = pointsInCameraSpace.map(point => perspectiveProjection(point, cam));
 
+    
+    const projectedPointsBeforDevide : Vec4[] = pointsInCameraSpace.map(point => perspectiveProjectionBeforePerspectiveDevide(point, cam));
 
-    const useTexture = meshHasValidUv(mesh);
+        const projectedPoints : Point[] = projectedPointsBeforDevide.map(projectedPoint => {
+        if (projectedPoint.w === 0) {
+            return { pos: { x: NaN, y: NaN, z: NaN }, u: 0, v: 0 };
+        }
+        return {
+            pos: {
+                x: projectedPoint.x / projectedPoint.w,
+                y: projectedPoint.y / projectedPoint.w,
+                z: projectedPoint.z / projectedPoint.w
+            },
+            u: 0,
+            v: 0
+        };
+    });
 
 
     const lightingState = getLightingState();
-    const lightDir = normaliseOrFallback(
-        lightingState.lightDirection.x,
-        lightingState.lightDirection.y,
-        lightingState.lightDirection.z,
-        { x: 0, y: 0, z: -1 },
-    );
+    const lightDir = normalise(lightingState.lightDirection);
     const ambient = Math.min(1, Math.max(0, lightingState.ambientStrength));
 
     mesh.triangleIndicesData.forEach(([a, b, c]) => {
@@ -242,13 +274,13 @@ function DrawMesh(mesh: Mesh, transform: MeshTransformState, cam: Camera ) {
         return;
     }
 
-    const projectedP1 = projectedPoints[a];
+    const projectedP1  = projectedPoints[a];
     const projectedP2 = projectedPoints[b];
     const projectedP3 = projectedPoints[c];
     if (
-        !Number.isFinite(projectedP1.x) || !Number.isFinite(projectedP1.y) || !Number.isFinite(projectedP1.z) ||
-        !Number.isFinite(projectedP2.x) || !Number.isFinite(projectedP2.y) || !Number.isFinite(projectedP2.z) ||
-        !Number.isFinite(projectedP3.x) || !Number.isFinite(projectedP3.y) || !Number.isFinite(projectedP3.z)
+        !Number.isFinite(projectedP1.pos.x) || !Number.isFinite(projectedP1.pos.y) || !Number.isFinite(projectedP1.pos.z) ||
+        !Number.isFinite(projectedP2.pos.x) || !Number.isFinite(projectedP2.pos.y) || !Number.isFinite(projectedP2.pos.z) ||
+        !Number.isFinite(projectedP3.pos.x) || !Number.isFinite(projectedP3.pos.y) || !Number.isFinite(projectedP3.pos.z)
     ) {
         return;
     }
@@ -257,7 +289,9 @@ function DrawMesh(mesh: Mesh, transform: MeshTransformState, cam: Camera ) {
     const p2 = convertPointFromNdcToScreenSpace(projectedP2);
     const p3 = convertPointFromNdcToScreenSpace(projectedP3);
 
-    const faceNormal = normaliseOrFallback(normal.x, normal.y, normal.z, { x: 0, y: 0, z: 1 });
+    // kind of like the fragment shader 
+
+    const faceNormal = normalise({ x: normal.x, y: normal.y, z: normal.z });
     const diffuse = Math.max(0, dotProduct(faceNormal, lightDir));
     const lighting = ambient + (1 - ambient) * diffuse;
     const shade = Math.round(lighting * 255);
@@ -265,27 +299,17 @@ function DrawMesh(mesh: Mesh, transform: MeshTransformState, cam: Camera ) {
 
     const col: Color = { r: shade, g: shade, b: shade, a: 255 };
 
-    // if mesh contains u,v data then set p.u and v 
-    if (useTexture && mesh.uvData) {
-        p1.u = mesh.uvData[a][0];
-        p1.v = mesh.uvData[a][1];
-        p2.u = mesh.uvData[b][0];
-        p2.v = mesh.uvData[b][1];
-        p3.u = mesh.uvData[c][0];
-        p3.v = mesh.uvData[c][1];
-    }
-
-    RasteriseTriangle(p1, p2, p3, col, useTexture ? checkersTexture : undefined, lighting);
+    RasteriseTriangle(p1, p2, p3, col, lighting);
 });
 
-    if (getRenderState().drawWireframe) {
-        mesh.triangleIndicesData.forEach(([a, b, c]) => {
-            const edgeColor: Color = { r: 255, g: 255, b: 255, a: 255 };
-            drawLine(projectedPoints[a], projectedPoints[b], edgeColor);
-            drawLine(projectedPoints[b], projectedPoints[c], edgeColor);
-            drawLine(projectedPoints[c], projectedPoints[a], edgeColor);
-        });
-    }
+    // if (getRenderState().drawWireframe) {
+    //     mesh.triangleIndicesData.forEach(([a, b, c]) => {
+    //         const edgeColor: Color = { r: 255, g: 255, b: 255, a: 255 };
+    //         drawLine(projectedPoints[a], projectedPoints[b], edgeColor);
+    //         drawLine(projectedPoints[b], projectedPoints[c], edgeColor);
+    //         drawLine(projectedPoints[c], projectedPoints[a], edgeColor);
+    //     });
+    // }
 
     // projectedPoints.forEach(point => {
     //     drawPoint(point);
@@ -293,8 +317,8 @@ function DrawMesh(mesh: Mesh, transform: MeshTransformState, cam: Camera ) {
 }
 
 function edgeFunction(a: Point, b: Point, c: Point): number {
-    const vectorAB = { x: b.x - a.x, y: b.y - a.y };
-    const vectorAC = { x: c.x - a.x, y: c.y - a.y };
+    const vectorAB = { x: b.pos.x - a.pos.x, y: b.pos.y - a.pos.y };
+    const vectorAC = { x: c.pos.x - a.pos.x, y: c.pos.y - a.pos.y };
     const cross = vectorAB.x * vectorAC.y - vectorAB.y * vectorAC.x;
     return cross;
 
@@ -304,17 +328,16 @@ function edgeFunction(a: Point, b: Point, c: Point): number {
      
 }
 
-function RasteriseTriangle(p1: Point, p2: Point, p3: Point, col: Color , texture?: Texture, shadeMultiplier: number = 1) {
+function RasteriseTriangle(p1: Point, p2: Point, p3: Point, col: Color, shadeMultiplier: number = 1) {
 
-    
     // Implement triangle rasterisation using barycentric coordinates
 
     //step 1 : compute the bounding box of the triangle 
 
-    const minX = Math.floor(Math.min(p1.x, p2.x, p3.x));
-    const maxX = Math.ceil(Math.max(p1.x, p2.x, p3.x));
-    const minY = Math.floor(Math.min(p1.y, p2.y, p3.y));
-    const maxY = Math.ceil(Math.max(p1.y, p2.y, p3.y)); 
+    const minX = Math.floor(Math.min(p1.pos.x, p2.pos.x, p3.pos.x));
+    const maxX = Math.ceil(Math.max(p1.pos.x, p2.pos.x, p3.pos.x));
+    const minY = Math.floor(Math.min(p1.pos.y, p2.pos.y, p3.pos.y));
+    const maxY = Math.ceil(Math.max(p1.pos.y, p2.pos.y, p3.pos.y)); 
 
     // clamp the bounding box to the screen dimensions
     const clampedMinX = Math.max(0, minX);
@@ -327,23 +350,14 @@ function RasteriseTriangle(p1: Point, p2: Point, p3: Point, col: Color , texture
 
     // also use Z values of the points to do depth testing and update the depth buffer accordingly
 
-
-    const hasTriangleUv =
-        Number.isFinite(p1.u) && Number.isFinite(p1.v) &&
-        Number.isFinite(p2.u) && Number.isFinite(p2.v) &&
-        Number.isFinite(p3.u) && Number.isFinite(p3.v);
-
     const areaABC = edgeFunction(p1, p2, p3);
     if (areaABC === 0) {
         return;
     }
 
-    const useTexture = Boolean(texture) && hasTriangleUv;
-    const activeTexture = useTexture && texture ? texture : checkersTexture;
-
     for(let x = clampedMinX; x <= clampedMaxX; x++) {
         for(let y = clampedMinY; y <= clampedMaxY; y++) {
-            const point: Point = { x, y, z: 0 };
+            const point: Point = { pos: { x, y, z: 0 }, u: 0, v: 0 } ;
             //cross product of AB And AC gives area of triangle ABC ( with sign ) and 
             // also tells us the winding of the triangle  clockwise or counterclockwise )
             const areaPBC = edgeFunction(point, p2, p3);
@@ -355,7 +369,7 @@ function RasteriseTriangle(p1: Point, p2: Point, p3: Point, col: Color , texture
             const w1 = areaPBC / areaABC;
             const w2 = areaAPC / areaABC;
             const w3 = areaABP / areaABC;
-            const z = w1 * p1.z + w2 * p2.z + w3 * p3.z;
+            const z = w1 * p1.pos.z + w2 * p2.pos.z + w3 * p3.pos.z;
 
             // check if point is inside the triangle 
             // if the point is on same side of all edges then its inside the triangle 
@@ -366,27 +380,7 @@ function RasteriseTriangle(p1: Point, p2: Point, p3: Point, col: Color , texture
                 (areaABC < 0 && areaPBC <= 0 && areaAPC <= 0 && areaABP <= 0);
 
             // barycentric interpolation to find the u and v values at this point
-            if (hasTriangleUv) {
-                const u = w1 * p1.u! + w2 * p2.u! + w3 * p3.u!; 
-                const v = w1 * p1.v! + w2 * p2.v! + w3 * p3.v!;
-
-                const clampedU = Math.min(1, Math.max(0, u));
-                const clampedV = Math.min(1, Math.max(0, v));
-
-                const texData = activeTexture.data;
-                const texWidth = activeTexture.width;
-                const texHeight = activeTexture.height;
-
-                const texX = Math.floor(clampedU * (texWidth - 1));
-                const texY = Math.floor(clampedV * (texHeight - 1));
-                
-                const texIndex = (texY * texWidth + texX) * 4;
-                col.r = texData[texIndex] * shadeMultiplier;
-                col.g = texData[texIndex + 1] * shadeMultiplier;
-                col.b = texData[texIndex + 2] * shadeMultiplier;
-                col.a = texData[texIndex + 3];
-
-            }
+           
 
             if (isInsideTriangle) {
                 const index = y * canvas.width + x;
@@ -394,14 +388,15 @@ function RasteriseTriangle(p1: Point, p2: Point, p3: Point, col: Color , texture
                     depthBuffer[index] = z;
                     setPixel(x, y, col);
                 }
+            }
         }
     
     }
 }
 
-}
 
 scene.addMesh("cube");
+scene.addMesh("quad");
 
 function renderScene(scene: Scene, ctx: CanvasRenderingContext2D) {
     const renderCam = getRenderCamera();

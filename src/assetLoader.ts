@@ -23,7 +23,15 @@ function parseOBJ(name: string, text: string): Mesh {
         const p = t.split(/\s+/);
 
         if (p[0] === "v") {
-            vertices.push({ x: +p[1], y: +p[2], z: +p[3] });
+            vertices.push({
+                pos: {
+                    x: Number(p[1]),
+                    y: Number(p[2]),
+                    z: Number(p[3])
+                },
+                u: 0,
+                v: 0
+            });
         }
 
         if (p[0] === "f") {
