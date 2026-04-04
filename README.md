@@ -1,10 +1,13 @@
-# Graphics Experiment
+# HTML Canvas Software Rasteriser 
+
 
 A simple software rasterizer experiment in TypeScript ,HTML Canvas 
 
 ## Screenshot
 
 ![Rasterizer screenshot](media/ss1.png)
+![Rasterizer screenshot 2](media/Screenshot%202026-04-02%20075706.png)
+![Rasterizer screenshot 3](media/Screenshot%202026-04-04%20160443.png)
 
 ## Videos
 
