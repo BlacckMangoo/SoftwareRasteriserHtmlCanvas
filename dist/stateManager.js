@@ -9,6 +9,7 @@ const lightingState = {
 };
 const renderState = {
     drawWireframe: true,
+    textureFilter: "nearest",
 };
 export function setUIState(selectedMesh) {
     uiState.selectedMesh = selectedMesh;
@@ -37,6 +38,7 @@ export function getLightingState() {
 }
 export function setRenderState(newState) {
     renderState.drawWireframe = newState.drawWireframe;
+    renderState.textureFilter = newState.textureFilter;
 }
 export function getRenderState() {
     return renderState;

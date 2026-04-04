@@ -1,3 +1,4 @@
+;
 export function dotProduct(a, b) {
     return a.x * b.x + a.y * b.y + a.z * b.z;
 }
@@ -114,14 +115,19 @@ export function perspectiveProjectionBeforePerspectiveDevide(point, cam) {
         r3: { x: 0, y: 0, z: (far + near) / (near - far), w: (2 * far * near) / (near - far) },
         r4: { x: 0, y: 0, z: -1, w: 0 },
     };
-    const pointVec4 = { x: point.x, y: point.y, z: point.z, w: 1 };
+    const pointVec4 = { x: point.pos.x, y: point.pos.y, z: point.pos.z, w: 1 };
     const projectedVec4 = {
         x: projectionMatrix.r1.x * pointVec4.x + projectionMatrix.r1.y * pointVec4.y + projectionMatrix.r1.z * pointVec4.z + projectionMatrix.r1.w * pointVec4.w,
         y: projectionMatrix.r2.x * pointVec4.x + projectionMatrix.r2.y * pointVec4.y + projectionMatrix.r2.z * pointVec4.z + projectionMatrix.r2.w * pointVec4.w,
         z: projectionMatrix.r3.x * pointVec4.x + projectionMatrix.r3.y * pointVec4.y + projectionMatrix.r3.z * pointVec4.z + projectionMatrix.r3.w * pointVec4.w,
         w: projectionMatrix.r4.x * pointVec4.x + projectionMatrix.r4.y * pointVec4.y + projectionMatrix.r4.z * pointVec4.z + projectionMatrix.r4.w * pointVec4.w,
     };
-    return projectedVec4;
+    return {
+        pos: projectedVec4,
+        u: point.u,
+        v: point.v,
+        wInv: 1 / projectedVec4.w
+    };
 }
 export function RotateAroundArbitraryAxisMatrix(input, axis, angle) {
     const normalisedAxis = normalise(axis);

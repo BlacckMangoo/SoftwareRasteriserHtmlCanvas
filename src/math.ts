@@ -1,8 +1,11 @@
-export interface Point {
-    x: number;
-    y: number;
-    z: number;
-}
+import { Point } from "./primitiveData";
+
+export interface ClipSpacePoint { 
+    pos: Vec4,
+    u: number,
+    v: number,
+    wInv : number, // 1/w for perspective correct interpolation
+} ;
 
 export interface Vec3 {
     x: number;
@@ -157,7 +160,7 @@ export function CameraBasis(cam: Camera): Matrix3 {
 }
 
 export function perspectiveProjectionBeforePerspectiveDevide
-(point: Point, cam: Camera): Vec4 {
+(point: Point, cam: Camera): ClipSpacePoint {
     const fov = cam.fov * (Math.PI / 180);
     const f = 1 / Math.tan(fov / 2);
     const ar = cam.ar;
@@ -171,7 +174,7 @@ export function perspectiveProjectionBeforePerspectiveDevide
         r4: { x: 0, y: 0, z: -1, w: 0 },
     };
 
-    const pointVec4: Vec4 = { x: point.x, y: point.y, z: point.z, w: 1 };
+    const pointVec4: Vec4 = { x: point.pos.x, y: point.pos.y, z: point.pos.z, w: 1 };
     const projectedVec4 = {
         x: projectionMatrix.r1.x * pointVec4.x + projectionMatrix.r1.y * pointVec4.y + projectionMatrix.r1.z * pointVec4.z + projectionMatrix.r1.w * pointVec4.w,
         y: projectionMatrix.r2.x * pointVec4.x + projectionMatrix.r2.y * pointVec4.y + projectionMatrix.r2.z * pointVec4.z + projectionMatrix.r2.w * pointVec4.w,
@@ -180,7 +183,12 @@ export function perspectiveProjectionBeforePerspectiveDevide
     };
 
 
-     return projectedVec4;
+     return {
+        pos: projectedVec4,
+         u: point.u,
+            v: point.v,
+        wInv: 1 / projectedVec4.w
+    };
 }
 
 export function RotateAroundArbitraryAxisMatrix(input: Vec3, axis: Vec3, angle: number): Vec3 {

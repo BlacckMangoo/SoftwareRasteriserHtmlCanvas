@@ -15,6 +15,7 @@ export interface LightingState {
 
 export interface RenderState {
     drawWireframe: boolean;
+    textureFilter: "nearest" | "bilinear";
 }
 
 const lightingState: LightingState = {
@@ -24,6 +25,7 @@ const lightingState: LightingState = {
 
 const renderState: RenderState = {
     drawWireframe: true,
+    textureFilter: "nearest",
 };
 
 export function setUIState(selectedMesh: string | null): void {
@@ -61,6 +63,7 @@ export function getLightingState(): LightingState {
 
 export function setRenderState(newState: RenderState): void {
     renderState.drawWireframe = newState.drawWireframe;
+    renderState.textureFilter = newState.textureFilter;
 }
 
 export function getRenderState(): RenderState {

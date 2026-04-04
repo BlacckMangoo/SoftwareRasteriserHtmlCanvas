@@ -18,6 +18,7 @@ interface PanelSection {
     addElement: <TElement extends HTMLElement>(element: TElement) => TElement;
     addSlider: (label: string, min: number, max: number, step: number, initialValue: number, onChange: (value: number) => void) => HTMLDivElement;
     addToggle: (label: string, initialValue: boolean, onChange: (value: boolean) => void) => HTMLDivElement;
+    addSelect: (label: string, options: Array<{ value: string; label: string }>, initialValue: string, onChange: (value: string) => void) => HTMLDivElement;
 }
 
 function createPanelSection(title: string): PanelSection {
@@ -158,6 +159,30 @@ function createPanelSection(title: string): PanelSection {
             row.append(labelElement, input);
             return addElement(row);
         },
+        addSelect: (label, options, initialValue, onChange) => {
+            const row = document.createElement("div");
+            row.className = "ui-toggle-row";
+
+            const labelElement = document.createElement("label");
+            labelElement.className = "ui-toggle-label";
+            labelElement.textContent = label;
+
+            const select = document.createElement("select");
+            select.className = "ui-select";
+
+            options.forEach((option) => {
+                const optionElement = document.createElement("option");
+                optionElement.value = option.value;
+                optionElement.textContent = option.label;
+                select.appendChild(optionElement);
+            });
+
+            select.value = initialValue;
+            select.addEventListener("change", () => onChange(select.value));
+
+            row.append(labelElement, select);
+            return addElement(row);
+        },
     };
 }
 
@@ -242,21 +267,21 @@ function initialiseUi(): void {
             setMeshTransformState(active, current);
         });
 
-        transformPanel.addSlider("Scale X", 0.1, 5, 0.01, state.scale.x, (value) => {
+        transformPanel.addSlider("Scale X", 0.01,0.1, 0.01, state.scale.x, (value) => {
             const active = getUIState().selectedMesh;
             if (!active) return;
             const current = getMeshTransformState(active);
             current.scale.x = value;
             setMeshTransformState(active, current);
         });
-        transformPanel.addSlider("Scale Y", 0.1, 5, 0.01, state.scale.y, (value) => {
+        transformPanel.addSlider("Scale Y", 0.01,0.1, 0.01, state.scale.y, (value) => {
             const active = getUIState().selectedMesh;
             if (!active) return;
             const current = getMeshTransformState(active);
             current.scale.y = value;
             setMeshTransformState(active, current);
         });
-        transformPanel.addSlider("Scale Z", 0.1, 5, 0.01, state.scale.z, (value) => {
+        transformPanel.addSlider("Scale Z",  0.01,0.1, 0.01, state.scale.z, (value) => {
             const active = getUIState().selectedMesh;
             if (!active) return;
             const current = getMeshTransformState(active);
@@ -304,7 +329,7 @@ function initialiseUi(): void {
         cam.position.y = value;
         setCameraState(cam);
     });
-    cameraPanel.addSlider("Cam Z", 5, 10, 0.1, getCameraState().position.z, (value) => {
+    cameraPanel.addSlider("Cam Z", 5, 30, 0.1, getCameraState().position.z, (value) => {
         const cam = getCameraState();
         cam.position.z = value;
         setCameraState(cam);
@@ -351,6 +376,20 @@ function initialiseUi(): void {
         renderState.drawWireframe = value;
         setRenderState(renderState);
     });
+
+    renderPanel.addSelect(
+        "Texture Filter",
+        [
+            { value: "nearest", label: "Nearest Neighbour" },
+            { value: "bilinear", label: "Bilinear" },
+        ],
+        getRenderState().textureFilter,
+        (value) => {
+            const renderState = getRenderState();
+            renderState.textureFilter = value as "nearest" | "bilinear";
+            setRenderState(renderState);
+        },
+    );
 
     const syncMeshNamesFromGlobal = (): void => {
         const nextMeshNames = Object.keys(mesheTransforms);

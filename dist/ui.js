@@ -122,6 +122,25 @@ function createPanelSection(title) {
             row.append(labelElement, input);
             return addElement(row);
         },
+        addSelect: (label, options, initialValue, onChange) => {
+            const row = document.createElement("div");
+            row.className = "ui-toggle-row";
+            const labelElement = document.createElement("label");
+            labelElement.className = "ui-toggle-label";
+            labelElement.textContent = label;
+            const select = document.createElement("select");
+            select.className = "ui-select";
+            options.forEach((option) => {
+                const optionElement = document.createElement("option");
+                optionElement.value = option.value;
+                optionElement.textContent = option.label;
+                select.appendChild(optionElement);
+            });
+            select.value = initialValue;
+            select.addEventListener("change", () => onChange(select.value));
+            row.append(labelElement, select);
+            return addElement(row);
+        },
     };
 }
 const clearPanelBody = (panelElement) => {
@@ -202,7 +221,7 @@ function initialiseUi() {
             current.rotationAxis.z = value;
             setMeshTransformState(active, current);
         });
-        transformPanel.addSlider("Scale X", 0.1, 5, 0.01, state.scale.x, (value) => {
+        transformPanel.addSlider("Scale X", 0.01, 0.1, 0.01, state.scale.x, (value) => {
             const active = getUIState().selectedMesh;
             if (!active)
                 return;
@@ -210,7 +229,7 @@ function initialiseUi() {
             current.scale.x = value;
             setMeshTransformState(active, current);
         });
-        transformPanel.addSlider("Scale Y", 0.1, 5, 0.01, state.scale.y, (value) => {
+        transformPanel.addSlider("Scale Y", 0.01, 0.1, 0.01, state.scale.y, (value) => {
             const active = getUIState().selectedMesh;
             if (!active)
                 return;
@@ -218,7 +237,7 @@ function initialiseUi() {
             current.scale.y = value;
             setMeshTransformState(active, current);
         });
-        transformPanel.addSlider("Scale Z", 0.1, 5, 0.01, state.scale.z, (value) => {
+        transformPanel.addSlider("Scale Z", 0.01, 0.1, 0.01, state.scale.z, (value) => {
             const active = getUIState().selectedMesh;
             if (!active)
                 return;
@@ -263,7 +282,7 @@ function initialiseUi() {
         cam.position.y = value;
         setCameraState(cam);
     });
-    cameraPanel.addSlider("Cam Z", 5, 10, 0.1, getCameraState().position.z, (value) => {
+    cameraPanel.addSlider("Cam Z", 5, 30, 0.1, getCameraState().position.z, (value) => {
         const cam = getCameraState();
         cam.position.z = value;
         setCameraState(cam);
@@ -306,6 +325,14 @@ function initialiseUi() {
     renderPanel.addToggle("Draw Wireframe", getRenderState().drawWireframe, (value) => {
         const renderState = getRenderState();
         renderState.drawWireframe = value;
+        setRenderState(renderState);
+    });
+    renderPanel.addSelect("Texture Filter", [
+        { value: "nearest", label: "Nearest Neighbour" },
+        { value: "bilinear", label: "Bilinear" },
+    ], getRenderState().textureFilter, (value) => {
+        const renderState = getRenderState();
+        renderState.textureFilter = value;
         setRenderState(renderState);
     });
     const syncMeshNamesFromGlobal = () => {

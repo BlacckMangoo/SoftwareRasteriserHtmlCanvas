@@ -5,31 +5,89 @@ import jpeg from "jpeg-js";
 const ROOT = process.cwd();
 const MODELS_DIR = path.join(ROOT, "dist/assets/models");
 const OUTPUT_FILE = path.join(ROOT, "src/loadedObj.ts");
+function resolveObjIndex(indexText, listLength) {
+    if (!indexText) {
+        return -1;
+    }
+    const parsed = Number(indexText);
+    if (!Number.isFinite(parsed) || parsed === 0) {
+        return -1;
+    }
+    if (parsed > 0) {
+        return parsed - 1;
+    }
+    return listLength + parsed;
+}
+function parseFaceToken(faceToken, positionCount, uvCount) {
+    const [positionPart, uvPart, thirdPart] = faceToken.split("/");
+    const positionIndex = resolveObjIndex(positionPart, positionCount);
+    let uvIndex = resolveObjIndex(uvPart, uvCount);
+    // Some exports write UVs as v//uv. If vt is missing but third slot resolves to a valid vt index, use it.
+    if (uvIndex < 0 && uvCount > 0) {
+        uvIndex = resolveObjIndex(thirdPart, uvCount);
+    }
+    return { positionIndex, uvIndex };
+}
 function parseOBJ(name, text) {
+    const rawPositions = [];
+    const rawUvs = [];
     const vertices = [];
     const triangleIndicesData = [];
+    const vertexMap = new Map();
+    const getOrCreateVertexIndex = (positionIndex, uvIndex) => {
+        if (positionIndex < 0 || positionIndex >= rawPositions.length) {
+            throw new Error(`Invalid vertex index ${positionIndex + 1} in '${name}'`);
+        }
+        const key = `${positionIndex}/${uvIndex}`;
+        const existing = vertexMap.get(key);
+        if (existing !== undefined) {
+            return existing;
+        }
+        const position = rawPositions[positionIndex];
+        const uv = rawUvs[uvIndex] ?? { u: 0, v: 0 };
+        const newIndex = vertices.length;
+        vertices.push({
+            pos: { x: position.x, y: position.y, z: position.z },
+            u: uv.u,
+            v: uv.v,
+        });
+        vertexMap.set(key, newIndex);
+        return newIndex;
+    };
     for (const line of text.split("\n")) {
         const t = line.trim();
-        if (!t)
+        if (!t || t.startsWith("#"))
             continue;
         const p = t.split(/\s+/);
         if (p[0] === "v") {
-            vertices.push({
-                pos: {
-                    x: Number(p[1]),
-                    y: Number(p[2]),
-                    z: Number(p[3])
-                },
-                u: 0,
-                v: 0
+            rawPositions.push({
+                x: Number(p[1]),
+                y: Number(p[2]),
+                z: Number(p[3]),
+            });
+        }
+        if (p[0] === "vt") {
+            rawUvs.push({
+                u: Number(p[1]),
+                v: Number(p[2]),
             });
         }
         if (p[0] === "f") {
-            triangleIndicesData.push([
-                Number(p[1].split("/")[0]) - 1,
-                Number(p[2].split("/")[0]) - 1,
-                Number(p[3].split("/")[0]) - 1
-            ]);
+            const faceIndices = p.slice(1).map((faceToken) => {
+                const { positionIndex, uvIndex } = parseFaceToken(faceToken, rawPositions.length, rawUvs.length);
+                return getOrCreateVertexIndex(positionIndex, uvIndex);
+            });
+            if (faceIndices.length < 3) {
+                continue;
+            }
+            // Triangulate n-gons using a fan around the first face vertex.
+            for (let i = 1; i < faceIndices.length - 1; i++) {
+                triangleIndicesData.push([
+                    faceIndices[0],
+                    faceIndices[i],
+                    faceIndices[i + 1],
+                ]);
+            }
         }
     }
     return { name, vertices, triangleIndicesData };
@@ -107,7 +165,7 @@ function downscaleTexture(texture, originalWidth, originalHeight, targetWidth, t
                 downscaledData[dstIndex + 3] = texture[srcIndex + 3]; // A
             }
             if (strat == "BiLinearFiltering") {
-                // Bilinear filtering downscaling (more complex, but smoother results)
+                // Bilinear filtering downscaling 
                 const srcX2 = Math.min(srcX + 1, originalWidth - 1);
                 const srcY2 = Math.min(srcY + 1, originalHeight - 1);
                 const xLerp = (x * xRatio) - srcX;
@@ -141,6 +199,6 @@ const textures = fs.readdirSync(TEXTURES_DIR)
     .sort()
     .map(file => ({
     exportName: exportName(file),
-    texture: imageToRGBATexture(file, 128, 128, "BiLinearFiltering")
+    texture: imageToRGBATexture(file, 512, 512, "Nearest")
 }));
 fs.writeFileSync(OUTPUT_TEXTURES_FILE, generateTextureTS(textures));
