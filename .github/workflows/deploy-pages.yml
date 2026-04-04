@@ -36,6 +36,7 @@ jobs:
         run: |
           mkdir -p public
           cp src/index.html public/index.html
+          cp src/panels.css public/panels.css
           sed -i 's|\.\./dist/|./dist/|g' public/index.html
           cp -r dist public/dist
 
