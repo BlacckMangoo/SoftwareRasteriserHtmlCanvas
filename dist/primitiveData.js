@@ -1,3 +1,4 @@
+import { defaultMaterial, roughMaterial } from "./material";
 const cubeVertexData = [
     // front face (z = 0.5)
     { pos: { x: -0.5, y: -0.5, z: 0.5 }, u: 0, v: 1 },
@@ -48,6 +49,7 @@ const quadMesh = {
         [0, 1, 2],
         [0, 2, 3]
     ],
+    material: defaultMaterial
 };
 const cubeMESH = {
     name: "cube",
@@ -66,6 +68,7 @@ const cubeMESH = {
         [20, 22, 21],
         [20, 23, 22]
     ],
+    material: roughMaterial
 };
 const triangleMESH = {
     name: "triangle",
@@ -73,5 +76,6 @@ const triangleMESH = {
     triangleIndicesData: [
         [0, 1, 2]
     ],
+    material: defaultMaterial
 };
 export { cubeMESH, triangleMESH, quadMesh };

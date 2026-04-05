@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { PNG } from "pngjs";
 import jpeg from "jpeg-js";
+import { defaultMaterial } from "./material.js";
 const ROOT = process.cwd();
 const MODELS_DIR = path.join(ROOT, "dist/assets/models");
 const OUTPUT_FILE = path.join(ROOT, "src/loadedObj.ts");
@@ -90,7 +91,7 @@ function parseOBJ(name, text) {
             }
         }
     }
-    return { name, vertices, triangleIndicesData };
+    return { name, vertices, triangleIndicesData, material: defaultMaterial };
 }
 function exportName(file) {
     const base = path.basename(file, ".obj").replace(/[^a-zA-Z0-9_]/g, "_");
@@ -102,9 +103,17 @@ function stringifyTS(obj) {
 }
 function generateObj(meshes) {
     return [
-        `import type { Mesh } from "./primitiveData";`,
+        `import type { Mesh } from "./primitiveData.js";`,
+        `import { defaultMaterial } from "./material.js";`,
         "",
-        ...meshes.map(m => `export const ${m.exportName}: Mesh = ${stringifyTS(m.mesh)};`),
+        ...meshes.map(m => {
+            const meshData = stringifyTS({
+                name: m.mesh.name,
+                vertices: m.mesh.vertices,
+                triangleIndicesData: m.mesh.triangleIndicesData,
+            });
+            return `export const ${m.exportName}: Mesh = { ...${meshData}, material: defaultMaterial };`;
+        }),
         "",
         `export const allLoadedObjs: Mesh[] = [${meshes.map(m => m.exportName).join(", ")}];`,
         ""

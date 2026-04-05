@@ -1,4 +1,7 @@
+import { Material } from "./material";
 import { Vec3 } from "./math";
+import { defaultMaterial,roughMaterial } from "./material";
+
 
 interface Point {
    pos : Vec3 ;
@@ -11,6 +14,7 @@ interface Mesh {
     name    : string;
     vertices: Point[];
     triangleIndicesData: Array<[number, number, number]>;
+    material: Material ;
 }
 
 
@@ -74,7 +78,7 @@ const quadMesh : Mesh = {
         [0, 1, 2],
         [0, 2, 3]
     ],
-   
+    material: defaultMaterial
 };
 
 const cubeMESH: Mesh = {
@@ -94,6 +98,7 @@ const cubeMESH: Mesh = {
         [20, 22, 21],
         [20, 23, 22]
     ],
+    material: roughMaterial
 
 };
 
@@ -103,6 +108,8 @@ const triangleMESH: Mesh = {
     triangleIndicesData: [
         [0, 1, 2]
     ],
+    material: defaultMaterial
+
 };
 
 

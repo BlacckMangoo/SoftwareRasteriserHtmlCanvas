@@ -1,15 +1,15 @@
 import { initialiseUi } from "./ui.js";
 import { getCameraState, getLightingState, getRenderState } from "./stateManager.js";
-import { mesheTransforms, syncMeshStates } from "./transform.js";
+import { meshTransforms, syncMeshStates } from "./transform.js";
 import type { MeshTransformState } from "./transform.js";
 import { createCam, updateCameraLookAt } from "./camera.js";
 import { CameraBasis, crossProduct, dotProduct, multiplyMatrix3Vec3, normalise, perspectiveProjectionBeforePerspectiveDevide, RotateAroundArbitraryAxisMatrix, ScaleVec3, TranslateVec3 } from "./math.js";
 import { Point,Mesh } from "./primitiveData.js";
-import { textures } from "./loadedTextures.js";
 import type { Texture } from "./texture.js";
 import type { Camera, ClipSpacePoint } from "./math.js";
 import { createScene } from "./scene.js";
 import type { Scene } from "./scene.js";
+import { teapotuv } from "./loadedObj.js";
 
 const RESOLUTION_FACTOR = 0.9 ; 
 
@@ -28,7 +28,7 @@ const depthBuffer = new Float32Array(canvas.width * canvas.height); // for depth
 
 const aspectRatio = canvas.width / canvas.height;
 
-interface Color {
+export interface Color {
     r: number;
     g: number;
     b: number;
@@ -39,9 +39,7 @@ interface Color {
 
 const scene = createScene(createCam(aspectRatio));
 
-const logoTexture: Texture = textures.WasLogo_png;
-const checkersTexture: Texture = textures.checkers_png;
-const roughTexture: Texture = textures.rough_jpg;
+
 function lerp(a: number, b: number, t: number): number {
     return a + (b - a) * t;
 }
@@ -423,7 +421,14 @@ function DrawMesh(mesh: Mesh, transform: MeshTransformState, cam: Camera ) {
     const shade = Math.round(lighting * 255);
   
 
-    const col: Color = { r: shade, g: shade, b: shade, a: 255 };
+    let col: Color = { r: shade, g: shade, b: shade, a: 255 };
+
+    col = {
+        r: Math.round(col.r * mesh.material.color.r / 255),
+        g: Math.round(col.g * mesh.material.color.g / 255),
+        b: Math.round(col.b * mesh.material.color.b / 255),
+        a: col.a,
+    };
 
     const clippedTriangles = clipTriangleAgainstNearPlane(
         projectedPointsBeforDevide[a],
@@ -467,7 +472,7 @@ function DrawMesh(mesh: Mesh, transform: MeshTransformState, cam: Camera ) {
         const p2 = convertPointFromNdcToScreenSpace(projectedP2);
         const p3 = convertPointFromNdcToScreenSpace(projectedP3);
 
-        RasteriseTriangle(p1, p2, p3, col, lighting);
+        RasteriseTriangle(p1, p2, p3, col, lighting, mesh.material.texture);
     });
 });
 
@@ -498,7 +503,7 @@ function edgeFunction(a: Point, b: Point, c: Point): number {
     // = 0 means that a, b and c are collinear
 }
 
-function RasteriseTriangle(p1: Point, p2: Point, p3: Point, col: Color, shadeMultiplier: number = 1) {
+function RasteriseTriangle(p1: Point, p2: Point, p3: Point, col: Color, shadeMultiplier: number = 1,texture : Texture ) {
 
     // Implement triangle rasterisation using barycentric coordinates
 
@@ -572,8 +577,8 @@ function RasteriseTriangle(p1: Point, p2: Point, p3: Point, col: Color, shadeMul
                     const interpolatedV = vOverW / interpolatedInvW;
 
                     const sampled = textureFilter === "nearest"
-                        ? sampleTextureNearestByUv(roughTexture, interpolatedU, interpolatedV)
-                        : sampleTextureBilinear(roughTexture, interpolatedU, interpolatedV);
+                        ? sampleTextureNearestByUv(texture, interpolatedU, interpolatedV)
+                        : sampleTextureBilinear(texture, interpolatedU, interpolatedV);
                     const lit = Math.max(0, Math.min(1, shadeMultiplier));
 
                     depthBuffer[index] = z;
@@ -591,7 +596,7 @@ function RasteriseTriangle(p1: Point, p2: Point, p3: Point, col: Color, shadeMul
 }
 
 
-scene.addMesh("teapotuv.obj");
+scene.addMesh(teapotuv);
 
 
 function renderScene(scene: Scene, ctx: CanvasRenderingContext2D) {
@@ -599,7 +604,7 @@ function renderScene(scene: Scene, ctx: CanvasRenderingContext2D) {
     scene.setCamera(renderCam);
     clearFrameBuffer({ r: 55, g: 55, b: 55, a: 225 });
     clearDepthBuffer();
-    scene.meshes.forEach((mesh) => DrawMesh(mesh, mesheTransforms[mesh.name], scene.cam));
+    scene.meshes.forEach((mesh) => DrawMesh(mesh, meshTransforms[mesh.name], scene.cam));
 }
 
 initialiseUi();

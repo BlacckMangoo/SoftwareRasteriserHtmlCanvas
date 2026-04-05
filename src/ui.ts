@@ -1,6 +1,6 @@
 
 import { getCameraState, getLightingState, getMeshTransformState, getRenderState, getUIState, setCameraState, setLightingState, setMeshTransformState, setRenderState, setUIState } from "./stateManager.js";
-import { ensureMeshStates, mesheTransforms } from "./transform.js";
+import { ensureMeshStates, meshTransforms } from "./transform.js";
 
 const getRoot = (): HTMLDivElement => {
     let root = document.getElementById("ui-root") as HTMLDivElement | null;
@@ -392,7 +392,7 @@ function initialiseUi(): void {
     );
 
     const syncMeshNamesFromGlobal = (): void => {
-        const nextMeshNames = Object.keys(mesheTransforms);
+        const nextMeshNames = Object.keys(meshTransforms);
         ensureMeshStates(nextMeshNames);
 
         const changed =

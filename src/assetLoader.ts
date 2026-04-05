@@ -4,6 +4,7 @@ import { PNG } from "pngjs";
 import jpeg from "jpeg-js";
 import type { Mesh, Point } from "./primitiveData";
 import type { Texture } from "./texture";
+import { defaultMaterial } from "./material.js";
 
 const ROOT = process.cwd();
 const MODELS_DIR = path.join(ROOT, "dist/assets/models");
@@ -117,7 +118,7 @@ function parseOBJ(name: string, text: string): Mesh {
         }
     }
 
-    return { name, vertices, triangleIndicesData };
+    return { name, vertices, triangleIndicesData, material: defaultMaterial };
 }
 
 function exportName(file: string): string {
@@ -132,11 +133,17 @@ function stringifyTS(obj : any): string {
 
 function generateObj(meshes: any[]): string {
     return [
-        `import type { Mesh } from "./primitiveData";`,
+        `import type { Mesh } from "./primitiveData.js";`,
+        `import { defaultMaterial } from "./material.js";`,
         "",
-        ...meshes.map(m =>
-`export const ${m.exportName}: Mesh = ${stringifyTS(m.mesh)};`
-        ),
+        ...meshes.map(m => {
+            const meshData = stringifyTS({
+                name: m.mesh.name,
+                vertices: m.mesh.vertices,
+                triangleIndicesData: m.mesh.triangleIndicesData,
+            });
+            return `export const ${m.exportName}: Mesh = { ...${meshData}, material: defaultMaterial };`;
+        }),
         "",
         `export const allLoadedObjs: Mesh[] = [${meshes.map(m => m.exportName).join(", ")}];`,
         ""

@@ -1,8 +1,10 @@
-import type { Mesh } from "./primitiveData";
+import type { Mesh } from "./primitiveData.js";
+
+import { defaultMaterial } from "./material.js";
 
 
 
-export const teapot: Mesh = {
+export const teapot: Mesh = { ...{
   name: "teapot.obj",
   vertices: [
     {
@@ -64404,9 +64406,9 @@ export const teapot: Mesh = {
       1391
     ]
   ]
-};
+}, material: defaultMaterial };
 
-export const teapotuv: Mesh = {
+export const teapotuv: Mesh = { ...{
   name: "teapotuv.obj",
   vertices: [
     {
@@ -217938,7 +217940,7 @@ export const teapotuv: Mesh = {
       8333
     ]
   ]
-};
+}, material: defaultMaterial };
 
 
 
