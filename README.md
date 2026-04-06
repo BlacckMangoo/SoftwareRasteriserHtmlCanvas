@@ -1,7 +1,9 @@
 # HTML Canvas Software Rasteriser 
 
 
-A simple software rasterizer experiment in TypeScript ,HTML Canvas 
+A simple software rasterizer  in TypeScript ,HTML Canvas 
+Written as an Education Project to understand the graphics pipeline in depth 
+
 
 ## Showcase
 

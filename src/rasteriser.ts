@@ -1,5 +1,5 @@
 import { initialiseUi } from "./ui.js";
-import { getCameraState, getLightingState, getRenderState } from "./stateManager.js";
+import { getCameraState, getLightingState, getMeshTransformState, getRenderState, setMeshTransformState } from "./stateManager.js";
 import { meshTransforms, syncMeshStates } from "./transform.js";
 import type { MeshTransformState } from "./transform.js";
 import { createCam, updateCameraLookAt } from "./camera.js";
@@ -821,6 +821,12 @@ function renderScene(scene: Scene, ctx: CanvasRenderingContext2D) {
 initialiseUi();
 
 syncMeshStates(scene.meshes.map((mesh) => mesh.name));
+
+const quadInitialState = getMeshTransformState(quadMesh.name);
+setMeshTransformState(quadMesh.name, {
+    ...quadInitialState,
+    scale: { x: 3, y: 3, z: 3 },
+});
 
 let fpsFrameCount = 0;
 let fpsLastSampleTime = performance.now();
