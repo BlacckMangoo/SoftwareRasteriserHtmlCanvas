@@ -1,6 +1,7 @@
 
 import { getCameraState, getLightingState, getMeshTransformState, getRenderState, getUIState, setCameraState, setLightingState, setMeshTransformState, setRenderState, setUIState } from "./stateManager.js";
 import { ensureMeshStates, meshTransforms } from "./transform.js";
+import { meshRegistery } from "./meshRegistry.js";
 
 const getRoot = (): HTMLDivElement => {
     let root = document.getElementById("ui-root") as HTMLDivElement | null;
@@ -209,6 +210,28 @@ function initialiseUi(): void {
     const lightingPanel = createPanelSection("Lighting");
     const renderPanel = createPanelSection("Render");
     const transformPanel = createPanelSection("Selected Mesh Transform");
+    const materialPanel = createPanelSection("Selected Mesh Material");
+
+    const updateSelectedMeshMaterialColor = (channel: "r" | "g" | "b" | "a", value: number): void => {
+        const active = getUIState().selectedMesh;
+        if (!active) {
+            return;
+        }
+
+        const mesh = meshRegistery[active];
+        if (!mesh) {
+            return;
+        }
+
+        const clamped = Math.max(0, Math.min(255, Math.round(value)));
+        mesh.material = {
+            ...mesh.material,
+            color: {
+                ...mesh.material.color,
+                [channel]: clamped,
+            },
+        };
+    };
 
     const renderTransformPanel = (): void => {
         clearPanelBody(transformPanel.element);
@@ -314,8 +337,44 @@ function initialiseUi(): void {
                 setUIState(meshName);
                 renderMeshPanel();
                 renderTransformPanel();
+                renderMaterialPanel();
             });
             meshPanel.addElement(item);
+        });
+    };
+
+    const renderMaterialPanel = (): void => {
+        clearPanelBody(materialPanel.element);
+        const selectedMesh = getUIState().selectedMesh;
+
+        if (!selectedMesh) {
+            const empty = document.createElement("div");
+            empty.textContent = "No mesh selected";
+            materialPanel.addElement(empty);
+            return;
+        }
+
+        const mesh = meshRegistery[selectedMesh];
+        if (!mesh) {
+            const missing = document.createElement("div");
+            missing.textContent = "Selected mesh not found";
+            materialPanel.addElement(missing);
+            return;
+        }
+
+        const color = mesh.material.color;
+
+        materialPanel.addSlider("Color R", 0, 255, 1, color.r, (value) => {
+            updateSelectedMeshMaterialColor("r", value);
+        });
+        materialPanel.addSlider("Color G", 0, 255, 1, color.g, (value) => {
+            updateSelectedMeshMaterialColor("g", value);
+        });
+        materialPanel.addSlider("Color B", 0, 255, 1, color.b, (value) => {
+            updateSelectedMeshMaterialColor("b", value);
+        });
+        materialPanel.addSlider("Alpha", 0, 255, 1, color.a, (value) => {
+            updateSelectedMeshMaterialColor("a", value);
         });
     };
 
@@ -413,6 +472,7 @@ function initialiseUi(): void {
 
         renderMeshPanel();
         renderTransformPanel();
+        renderMaterialPanel();
     };
 
     syncMeshNamesFromGlobal();

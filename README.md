@@ -3,14 +3,36 @@
 
 A simple software rasterizer experiment in TypeScript ,HTML Canvas 
 
-## Screenshot
+## Showcase
 
-![Rasterizer screenshot](media/ss1.png)
-![Rasterizer screenshot 2](media/Screenshot%202026-04-02%20075706.png)
-![Rasterizer screenshot 3](media/Screenshot%202026-04-04%20160443.png)
+Features : 
 
-## Videos
+1. Line Rendering using Bresenham algorithm , and Triangle rasterisation using Barycentric interpolation 
 
-- [Screen Recording 2026-04-02 041036](media/Screen%20Recording%202026-04-02%20041036.mp4)
-- [Screen Recording 2026-04-03 202333](media/Screen%20Recording%202026-04-03%20202333.mp4)
-- [Screen Recording 2026-04-04 160503](media/Screen%20Recording%202026-04-04%20160503.mp4)
+-![Rasterizer screenshot](media/ss1.png)
+
+2. Texture Sampling , Filtering ( Nearest Neighbour and Bi linear filtering )
+
+-![Rasterizer screenshot 3](media/Screenshot%202026-04-04%20160443.png)
+
+3. Obj Loading 
+-![Rasterizer screenshot 2](media/Screenshot%202026-04-02%20075706.png)
+
+4. Near and far plane Clipping 
+
+
+-![clipping](media/clipping.gif)
+
+5. Alpha Blending 
+
+-![AlphaBlending](media/alpha%20blending.gif)
+
+6. Stencil Buffer for masking parts of framebuffer 
+
+7. Z buffering 
+
+8. Back Face Culling 
+
+9. Custom Math Utilities 
+
+

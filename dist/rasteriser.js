@@ -603,14 +603,19 @@ function RasteriseTriangle(p1, p2, p3, col, shadeMultiplier = 1, texture) {
 }
 scene.addMesh(teapotuv);
 scene.addMesh(quadMesh);
+function calculateOpaqueAndTransparentMeshes(meshes) {
+    return {
+        opaqueMeshes: meshes.filter((mesh) => mesh.material.color.a >= 255),
+        transparentMeshes: meshes.filter((mesh) => mesh.material.color.a < 255),
+    };
+}
 function renderScene(scene, ctx) {
     const renderCam = getRenderCamera();
     scene.setCamera(renderCam);
     clearFrameBuffer({ r: 55, g: 55, b: 55, a: 225 });
     clearDepthBuffer();
     ClearStencilBuffer();
-    const opaqueMeshes = scene.meshes.filter((mesh) => mesh.material.color.a >= 255);
-    const transparentMeshes = scene.meshes.filter((mesh) => mesh.material.color.a < 255);
+    const { opaqueMeshes, transparentMeshes } = calculateOpaqueAndTransparentMeshes(scene.meshes);
     depthTestOn();
     depthWriteOn();
     alphaBlendingOff();
@@ -624,7 +629,7 @@ initialiseUi();
 syncMeshStates(scene.meshes.map((mesh) => mesh.name));
 let fpsFrameCount = 0;
 let fpsLastSampleTime = performance.now();
-setInterval(() => {
+function render() {
     if (ctx) {
         renderScene(scene, ctx);
         DrawFrameBuffer();
@@ -638,4 +643,7 @@ setInterval(() => {
             fpsLastSampleTime = now;
         }
     }
-}, 4);
+    requestAnimationFrame(render);
+}
+;
+requestAnimationFrame(render);
