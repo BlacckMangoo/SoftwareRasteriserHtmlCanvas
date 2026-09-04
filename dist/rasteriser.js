@@ -5,8 +5,7 @@ import { createCam, updateCameraLookAt } from "./camera.js";
 import { CameraBasis, crossProduct, dotProduct, multiplyMatrix3Vec3, normalise, perspectiveProjectionBeforePerspectiveDevide, RotateAroundArbitraryAxisMatrix, ScaleVec3, TranslateVec3 } from "./math.js";
 import { quadMesh } from "./primitiveData.js";
 import { createScene } from "./scene.js";
-import { teapotuv } from "./loadedObj.js";
-const RESOLUTION_FACTOR = 0.9;
+const RESOLUTION_FACTOR = 0.4;
 const canvas = document.getElementById("canvas");
 export const ctx = canvas.getContext("2d");
 canvas.width = window.innerWidth * RESOLUTION_FACTOR;
@@ -601,8 +600,17 @@ function RasteriseTriangle(p1, p2, p3, col, shadeMultiplier = 1, texture) {
         }
     }
 }
-scene.addMesh(teapotuv);
+//scene.addMesh(teapotuv);
 scene.addMesh(quadMesh);
+const a = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+let b = { 1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6, 7: 7, 8: 8, 9: 9, 10: 10 };
+let c = a.filter(x => x % 2 === 0); // remove elements if they dont satisfy a condition
+let d = a.map(x => x * 2); // apply an operation to each element 
+//reduce 
+let e = a.reduce((acc, x) => acc + x, 0); // reduce the array to a single value by applying an operation cumulatively to the elements from left to right
+console.log(c);
+console.log(d);
+console.log(e);
 function calculateOpaqueAndTransparentMeshes(meshes) {
     return {
         opaqueMeshes: meshes.filter((mesh) => mesh.material.color.a >= 255),
